@@ -12,13 +12,6 @@ export interface LineMatch {
   ranges: Range[];
 }
 
-export interface TextSearchResult {
-  /** The first matching lines, up to the limit */
-  matches: LineMatch[];
-  /** How many lines match in all */
-  total: number;
-}
-
 /** A part of a note: the lines from `first` on. */
 export interface Excerpt {
   /** Number of the first line, starting at 0 */
@@ -26,122 +19,219 @@ export interface Excerpt {
   lines: string[];
 }
 
-interface Note {
-  text: string;
-  /** Lowercased text, to find a query whatever its case */
-  lower: string;
-  /** The lines of the text. Split only once a line is needed. */
-  lines?: string[];
+/** How many characters a text has. A character outside the basic plane counts as one. */
+function countCharacters(text: string): number {
+  return Array.from(text).length;
 }
 
 /**
- * Finds every place where a lowercased line has the lowercased query.
- * Lowercasing may change the length of unusual text. Then the places would not
- * fit the line, so none are returned.
+ * Makes the pattern that finds a query as it is typed, whatever its case.
+ * It reads the text of a note as it is, so no lowercased copy has to be kept.
+ *
+ * A letter stands for itself in lower and in upper case, and every other
+ * character for itself. That is faster than a pattern that ignores case: text
+ * without letters that have a case, such as Korean, is found by a plain scan.
  */
+function toPattern(query: string): RegExp {
+  let source = "";
+  for (const character of query) {
+    const cases = new Set(
+      [character, character.toLowerCase(), character.toUpperCase()].filter(
+        // "ß" is "SS" in upper case. Such a letter only stands for itself.
+        (variant) => countCharacters(variant) === 1,
+      ),
+    );
+    source +=
+      cases.size > 1
+        ? `[${Array.from(cases).join("")}]`
+        : character.replace(/[.*+?^${}()|[\]\\]/, "\\$&");
+  }
+  return new RegExp(source, "gu");
+}
+
+/** Returns a line of a text, without its line break. */
+function lineOf(text: string, start: number, lineBreak: number): string {
+  let end = lineBreak === -1 ? text.length : lineBreak;
+  if (end > start && text[end - 1] === "\r") {
+    end--;
+  }
+  return text.slice(start, end);
+}
+
+/** Finds every place where a line has the query, whatever its case. */
 export function findAll(line: string, query: string): Range[] {
-  const ranges: Range[] = [];
-  const lowerLine = line.toLowerCase();
-  const lowerQuery = query.toLowerCase();
-  if (lowerQuery === "" || lowerLine.length !== line.length) {
-    return ranges;
+  if (query === "") {
+    return [];
   }
-  for (
-    let at = lowerLine.indexOf(lowerQuery);
-    at !== -1;
-    at = lowerLine.indexOf(lowerQuery, at + lowerQuery.length)
+  return Array.from(line.matchAll(toPattern(query)), (found) => ({
+    start: found.index,
+    end: found.index + found[0].length,
+  }));
+}
+
+/**
+ * A search for the lines that have a query. It is done in parts, so that
+ * whoever runs it can do something else in between, and can drop it when the
+ * query changes.
+ *
+ * The first matching lines are listed. Once the list is full, the rest of the
+ * matching lines are only counted, which takes less.
+ */
+export class TextSearch {
+  /** The first matching lines that were found so far, up to the limit */
+  readonly matches: LineMatch[] = [];
+  /** How many matching lines were found so far */
+  total = 0;
+  /** True once every note was looked at */
+  done: boolean;
+
+  readonly query: string;
+  private readonly texts: ReadonlyMap<string, string>;
+  private readonly paths: readonly string[];
+  private readonly limit: number;
+  private readonly pattern: RegExp | null;
+  /** How many of the paths were looked at */
+  private next = 0;
+
+  /**
+   * @param texts the texts of the notes by their paths
+   * @param paths the notes to look in. Their order is the order of the result.
+   * @param limit how many matching lines to list
+   */
+  constructor(
+    texts: ReadonlyMap<string, string>,
+    query: string,
+    paths: readonly string[],
+    limit: number,
   ) {
-    ranges.push({ start: at, end: at + lowerQuery.length });
+    this.texts = texts;
+    this.query = query;
+    this.paths = paths;
+    this.limit = limit;
+    this.pattern = query.trim() === "" ? null : toPattern(query);
+    this.done = this.pattern === null || paths.length === 0;
   }
-  return ranges;
+
+  /**
+   * Looks at note after note, until all are done or it is time for a pause.
+   *
+   * @param isTimeForPause asked after each note. Left out, the search runs to its end.
+   */
+  run(isTimeForPause?: () => boolean): void {
+    const { pattern, paths } = this;
+    while (pattern && !this.done) {
+      const path = paths[this.next++];
+      const text = path === undefined ? undefined : this.texts.get(path);
+      if (path !== undefined && text !== undefined) {
+        this.look(path, text, pattern);
+      }
+      this.done = this.next >= paths.length;
+      if (isTimeForPause?.()) {
+        return;
+      }
+    }
+  }
+
+  private look(path: string, text: string, pattern: RegExp): void {
+    pattern.lastIndex = 0;
+    let line = 0;
+    // Where the line that is being looked at starts
+    let lineStart = 0;
+    while (this.matches.length < this.limit) {
+      const found = pattern.exec(text);
+      if (!found) {
+        return;
+      }
+      // Count the line breaks up to the match to know its line
+      for (
+        let lineBreak = text.indexOf("\n", lineStart);
+        lineBreak !== -1 && lineBreak < found.index;
+        lineBreak = text.indexOf("\n", lineStart)
+      ) {
+        line++;
+        lineStart = lineBreak + 1;
+      }
+      const lineEnd = text.indexOf("\n", found.index);
+      const lineText = lineOf(text, lineStart, lineEnd);
+      this.total++;
+      this.matches.push({
+        path,
+        line,
+        text: lineText,
+        ranges: findAll(lineText, this.query),
+      });
+
+      // Go on after this line, so that it is listed once
+      if (lineEnd === -1) {
+        return;
+      }
+      line++;
+      lineStart = lineEnd + 1;
+      pattern.lastIndex = lineStart;
+    }
+
+    // The list is full. A line that is only counted needs no number and no text.
+    while (pattern.test(text)) {
+      this.total++;
+      const lineEnd = text.indexOf("\n", pattern.lastIndex);
+      if (lineEnd === -1) {
+        return;
+      }
+      pattern.lastIndex = lineEnd + 1;
+    }
+  }
 }
 
 /** The texts of the notes, searchable line by line. */
 export class TextIndex {
-  private readonly notes = new Map<string, Note>();
+  private readonly texts = new Map<string, string>();
 
   /** Adds a note or replaces its text. */
   set(path: string, text: string): void {
-    this.notes.set(path, { text, lower: text.toLowerCase() });
+    this.texts.set(path, text);
   }
 
   /** Forgets every note whose path is not among the given ones. */
   retain(paths: Set<string>): void {
-    for (const path of this.notes.keys()) {
+    for (const path of this.texts.keys()) {
       if (!paths.has(path)) {
-        this.notes.delete(path);
+        this.texts.delete(path);
       }
     }
   }
 
   /**
-   * Finds the lines that have the query as it is typed, whatever its case.
-   * A line is listed once, however often it has the query.
+   * Starts a search for the lines that have the query as it is typed, whatever
+   * its case. A line is listed once, however often it has the query.
+   * Nothing is found before the search is run.
    *
    * @param paths the notes to look in. Their order is the order of the result.
-   * @param limit how many matching lines to return. All of them are counted.
+   * @param limit how many matching lines to list. All of them are counted.
    */
-  search(query: string, paths: string[], limit: number): TextSearchResult {
-    const result: TextSearchResult = { matches: [], total: 0 };
-    const lowerQuery = query.toLowerCase();
-    if (lowerQuery.trim() === "") {
-      return result;
-    }
-
-    for (const path of paths) {
-      const note = this.notes.get(path);
-      if (!note) {
-        continue;
-      }
-      const { lower } = note;
-      let line = 0;
-      // Where the line that is being looked at starts
-      let lineStart = 0;
-      let at = lower.indexOf(lowerQuery);
-      while (at !== -1) {
-        // Count the line breaks up to the match to know its line
-        for (
-          let lineBreak = lower.indexOf("\n", lineStart);
-          lineBreak !== -1 && lineBreak < at;
-          lineBreak = lower.indexOf("\n", lineStart)
-        ) {
-          line++;
-          lineStart = lineBreak + 1;
-        }
-
-        result.total++;
-        if (result.matches.length < limit) {
-          const text = this.linesOf(note)[line] ?? "";
-          result.matches.push({ path, line, text, ranges: findAll(text, query) });
-        }
-
-        // Go on after this line, so that it is listed once
-        const lineEnd = lower.indexOf("\n", at);
-        if (lineEnd === -1) {
-          break;
-        }
-        line++;
-        lineStart = lineEnd + 1;
-        at = lower.indexOf(lowerQuery, lineStart);
-      }
-    }
-    return result;
+  search(query: string, paths: readonly string[], limit: number): TextSearch {
+    return new TextSearch(this.texts, query, paths, limit);
   }
 
   /** Returns the lines around a line of a note, or null if the note is unknown. */
   excerpt(path: string, line: number, radius: number): Excerpt | null {
-    const note = this.notes.get(path);
-    if (!note) {
+    const text = this.texts.get(path);
+    if (text === undefined) {
       return null;
     }
-    const lines = this.linesOf(note);
     const first = Math.max(0, line - radius);
-    return { first, lines: lines.slice(first, line + radius + 1) };
-  }
-
-  private linesOf(note: Note): string[] {
-    note.lines ??= note.text.split("\n").map((line) => line.replace(/\r$/, ""));
-    return note.lines;
+    const excerpt: Excerpt = { first, lines: [] };
+    let lineStart = 0;
+    for (let number = 0; number <= line + radius; number++) {
+      const lineBreak = text.indexOf("\n", lineStart);
+      if (number >= first) {
+        excerpt.lines.push(lineOf(text, lineStart, lineBreak));
+      }
+      if (lineBreak === -1) {
+        break;
+      }
+      lineStart = lineBreak + 1;
+    }
+    return excerpt;
   }
 }
 

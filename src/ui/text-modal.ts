@@ -2,7 +2,12 @@ import type { App } from "obsidian";
 import type { NoteTexts } from "../note-texts.ts";
 import { FileIndex } from "../search/file-index.ts";
 import { toSegments } from "../search/highlight.ts";
-import { findAll, type LineMatch, toSnippet } from "../search/text-index.ts";
+import {
+  findAll,
+  type LineMatch,
+  type TextSearch,
+  toSnippet,
+} from "../search/text-index.ts";
 import { makeDraggable } from "./drag.ts";
 import { dragSplit } from "./layout.ts";
 import {
@@ -17,6 +22,19 @@ import {
 const PREVIEW_RADIUS = 60;
 /** How many characters of a line a result shows */
 const SNIPPET_LENGTH = 160;
+/**
+ * How many milliseconds a search goes on before it makes room for a keystroke
+ * and for the dialog to be painted
+ */
+const SEARCH_PART_MS = 10;
+/** After how many notes a search looks at the clock. Looking takes time as well. */
+const NOTES_PER_LOOK_AT_CLOCK = 8;
+/**
+ * How many milliseconds pass at least before a list that is not full yet is
+ * filled again with what was found since. Filling it takes longer than a part
+ * of the search, so doing it after every part would hold the search up.
+ */
+const LIST_AGAIN_MS = 100;
 
 /** A dialog that finds a text in the notes and opens a note at the line that has it. */
 export class TextModal extends SwitcherModal<LineMatch> {
@@ -34,6 +52,15 @@ export class TextModal extends SwitcherModal<LineMatch> {
   /** The result that the preview shows */
   private previewed: LineMatch | null = null;
   private isReading = true;
+
+  /** The search for the query, which may still be going on */
+  private search: TextSearch | null = null;
+  /** How many matches of the search the list has, and when it got them */
+  private listed = 0;
+  private listedAt = 0;
+  /** Calls for the next part of a search, after whatever else is waiting */
+  private readonly nextPart = new MessageChannel();
+  private isNextPartCalled = false;
 
   constructor(
     app: App,
@@ -83,6 +110,11 @@ export class TextModal extends SwitcherModal<LineMatch> {
     });
     this.previewEl = bodyEl.createDiv({ cls: "the-switcher-preview" });
 
+    this.nextPart.port1.onmessage = () => {
+      this.isNextPartCalled = false;
+      this.searchOn();
+    };
+
     // The selection moves with the arrow keys and the mouse. The list marks it
     // with a class, so watching the classes tells when to change the preview.
     this.selectionObserver = new MutationObserver(() => this.updatePreview());
@@ -102,6 +134,8 @@ export class TextModal extends SwitcherModal<LineMatch> {
   override onClose(): void {
     super.onClose();
     this.selectionObserver.disconnect();
+    this.search = null;
+    this.nextPart.port1.close();
   }
 
   getSuggestions(query: string): LineMatch[] {
@@ -111,14 +145,24 @@ export class TextModal extends SwitcherModal<LineMatch> {
       this.setStatus("");
       return [];
     }
-    this.emptyStateText =
-      query.trim() === "" ? "Type the text to find." : "No results found.";
-    const { matches, total } = this.texts.index.search(
-      query,
-      this.paths,
-      MAX_RESULTS,
-    );
-    return this.show(matches, total);
+    // The search itself asks for its results to be listed again when it finds more
+    if (this.search?.query !== query) {
+      this.search = this.texts.index.search(query, this.paths, MAX_RESULTS);
+      this.searchPart(this.search);
+    }
+    const { matches, total, done } = this.search;
+    this.listed = matches.length;
+    this.listedAt = performance.now();
+    if (!done) {
+      this.emptyStateText = "Searching...";
+    } else if (query.trim() === "") {
+      this.emptyStateText = "Type the text to find.";
+    } else {
+      this.emptyStateText = "No results found.";
+    }
+    this.setStatus(`${matches.length} / ${done ? total : "..."}`);
+    // The search adds to its matches. The list gets the ones there are now.
+    return matches.slice();
   }
 
   renderSuggestion(match: LineMatch, el: HTMLElement): void {
@@ -148,6 +192,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
   protected onExcludeChange(): void {
     this.notes.exclude(this.excludePatterns);
     this.paths = this.notes.search([]).map((hit) => hit.entry.file.path);
+    this.search = null;
   }
 
   protected openResult(match: LineMatch, target: Target): Promise<void> {
@@ -164,7 +209,61 @@ export class TextModal extends SwitcherModal<LineMatch> {
       console.error("The Switcher: failed to read the notes", error);
     }
     this.isReading = false;
+    this.search = null;
     this.refresh();
+  }
+
+  /**
+   * Does a part of a search. A search of many notes takes longer than a
+   * keystroke may wait, so it stops after a moment and goes on after whatever
+   * came up in the meantime. A keystroke that changes the query drops it.
+   */
+  private searchPart(search: TextSearch): void {
+    const end = performance.now() + SEARCH_PART_MS;
+    let notes = 0;
+    search.run(
+      () => ++notes % NOTES_PER_LOOK_AT_CLOCK === 0 && performance.now() >= end,
+    );
+    if (!search.done && !this.isNextPartCalled) {
+      this.isNextPartCalled = true;
+      this.nextPart.port2.postMessage(null);
+    }
+  }
+
+  /** Goes on with the search, and shows what it found. */
+  private searchOn(): void {
+    const { search } = this;
+    if (!search || search.done) {
+      return;
+    }
+    this.searchPart(search);
+
+    const hasMore = search.matches.length > this.listed;
+    const isTimeToList =
+      search.done ||
+      search.matches.length >= MAX_RESULTS ||
+      performance.now() - this.listedAt >= LIST_AGAIN_MS;
+    if ((hasMore && isTimeToList) || (search.done && this.listed === 0)) {
+      this.listAgain();
+    } else if (search.done) {
+      // The list has all it gets. Now the lines are counted as well.
+      this.setStatus(`${this.listed} / ${search.total}`);
+    }
+  }
+
+  /** Lists the results again now that there are more, with the selection where it was. */
+  private listAgain(): void {
+    const listEl = this.resultContainerEl;
+    const selected = Array.from(listEl.children).findIndex((el) =>
+      el.hasClass("is-selected"),
+    );
+    const { scrollTop } = listEl;
+    this.refresh();
+    // A list that is filled again starts with its first result selected
+    for (let i = 0; i < selected; i++) {
+      this.moveSelection("ArrowDown");
+    }
+    listEl.scrollTop = scrollTop;
   }
 
   private updatePreview(): void {

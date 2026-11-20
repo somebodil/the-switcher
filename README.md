@@ -84,6 +84,8 @@ The results are ordered by note, alphabetically by the name of the note, and wit
 
 The notes are read when the dialog opens: all of them the first time, and after that only the ones that changed. In a large vault the first time takes a moment, and the dialog says `Reading the notes...` until it is done.
 
+A search does not hold up your typing. In a large vault it looks at the notes a few at a time, and lists the first lines while it is still looking at the rest. The number of matching lines comes last: it reads `50 / ...` until every note was looked at. A keystroke that changes the text starts the search over.
+
 ## Keys
 
 Both dialogs have the same keys. `Mod` is `Ctrl` on Windows and Linux, and `Cmd` on macOS.
@@ -150,7 +152,8 @@ To try a build, copy `main.js`, `manifest.json`, and `styles.css` to `.obsidian/
 
 ## Acknowledgements
 
-Inspired by Go to File and Find in Files in [IntelliJ IDEA](https://www.jetbrains.com/idea/).
+- Inspired by Go to File and Find in Files in [IntelliJ IDEA](https://www.jetbrains.com/idea/).
+- Some ideas for the query of Go to file, such as `<cd>` for the folder of the file you are looking at, come from [Another Quick Switcher](https://github.com/tadashi-aikawa/obsidian-another-quick-switcher) by Tadashi Aikawa. The Switcher shares no code with it.
 
 ## License
 

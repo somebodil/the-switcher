@@ -148,6 +148,11 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
     this.inputEl.dispatchEvent(new Event("input"));
   }
 
+  /** Moves the selection to the result before or after it, as the arrow keys do. */
+  protected moveSelection(key: "ArrowUp" | "ArrowDown"): void {
+    this.inputEl.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  }
+
   /** Tells how many results are shown of how many there are. */
   protected show(results: T[], total: number): T[] {
     this.setStatus(`${results.length} / ${total}`);
@@ -338,15 +343,16 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
         action(evt);
         return false;
       };
-    const pressArrow = (key: "ArrowUp" | "ArrowDown") =>
-      unlessComposing(() => {
-        this.inputEl.dispatchEvent(
-          new KeyboardEvent("keydown", { key, bubbles: true }),
-        );
-      });
-
-    this.scope.register(["Mod"], "P", pressArrow("ArrowUp"));
-    this.scope.register(["Mod"], "N", pressArrow("ArrowDown"));
+    this.scope.register(
+      ["Mod"],
+      "P",
+      unlessComposing(() => this.moveSelection("ArrowUp")),
+    );
+    this.scope.register(
+      ["Mod"],
+      "N",
+      unlessComposing(() => this.moveSelection("ArrowDown")),
+    );
     // The key event has the modifier, which is what asks for a new tab
     this.scope.register(
       ["Mod"],
