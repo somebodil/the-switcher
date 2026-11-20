@@ -177,7 +177,7 @@ suite("describe", () => {
         { text: "ta", highlighted: false },
       ],
       extension: null,
-      folderName: "Notes",
+      folder: { outer: "", inner: "Notes" },
       aliases: [],
     });
   });
@@ -189,7 +189,7 @@ suite("describe", () => {
         { text: "c", highlighted: true },
       ],
       extension: "png",
-      folderName: "img",
+      folder: { outer: "", inner: "img" },
       aliases: [],
     });
   });
@@ -200,7 +200,7 @@ suite("describe", () => {
       {
         name: [{ text: "with-alias", highlighted: false }],
         extension: null,
-        folderName: "Notes",
+        folder: { outer: "", inner: "Notes" },
         aliases: [
           [
             { text: "Z", highlighted: false },
@@ -212,17 +212,21 @@ suite("describe", () => {
     );
   });
 
-  it("highlights the part after the last slash and names the innermost folder", () => {
+  it("highlights the part after the last slash and gives the path of the folder in two parts", () => {
     const shown = view("Deep/pl -zzz", file("Projects/Deep/Alpha plan.md"));
     assert.deepEqual(shown.name, [
       { text: "Alpha ", highlighted: false },
       { text: "pl", highlighted: true },
       { text: "an", highlighted: false },
     ]);
-    assert.equal(shown.folderName, "Deep");
+    assert.deepEqual(shown.folder, { outer: "Projects", inner: "/Deep" });
+    assert.deepEqual(view("x", file("A/B C/D/E/x.md")).folder, {
+      outer: "A/B C/D",
+      inner: "/E",
+    });
   });
 
-  it("has no folder name for a file in the root of the vault", () => {
-    assert.equal(view("root", file("root-note.md")).folderName, "");
+  it("has no folder for a file in the root of the vault", () => {
+    assert.deepEqual(view("root", file("root-note.md")).folder, { outer: "", inner: "" });
   });
 });

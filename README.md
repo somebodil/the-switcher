@@ -60,6 +60,7 @@ Words are separated by spaces, and a file has to match all of them. Upper and lo
 | `Notes/alpha`  | Of those, the files with `alpha` in the name or in an alias              |
 
 - Files other than Markdown notes show their extension and are found by it. `png` lists the PNG images.
+- A result shows the name of the file and, after it, the path of its folder. A path that is too long for the row is cut in its middle: `Projects/2026…/Notes`.
 - When a word matches an alias, that alias is shown under the name.
 - A word is also looked up as a whole in the folder path. `Notes/alpha` therefore lists everything in a folder `Notes/Alpha` as well.
 
@@ -81,7 +82,7 @@ Type a text, and the dialog lists every line of your Markdown notes that has it,
 - Upper and lower case are the same.
 - A line is listed once, however often it has the text.
 
-The right side shows the note around the selected line, with the text highlighted. It follows the selection as you move through the results.
+Under the results, the dialog shows the note around the selected line, with the text highlighted. This preview follows the selection as you move through the results.
 
 Opening a result opens the note at that line, with the text selected.
 
@@ -133,7 +134,7 @@ You change the size of a dialog with the mouse.
 
 - **Width.** Drag the left or the right side. A dialog stays in the middle of the window, so both sides move.
 - **Height.** Drag the lower side. A lower corner changes the width and the height at once.
-- **Results and preview.** In **Find in files**, drag the line between the results and the preview to give one of them more room.
+- **Results and preview.** In **Find in files**, drag the line between the results and the preview up or down to give one of them more room.
 - **Back to the start.** Double-click what you dragged, and it is as it was before you changed it.
 
 Each dialog remembers its own size. The sizes are kept on the device and not in `data.json`, so a sync does not carry them to a screen they do not fit.

@@ -70,9 +70,11 @@ export class TextModal extends SwitcherModal<LineMatch> {
     super(app, {
       ...options,
       placeholder: "Find text in notes",
-      layoutKey: "the-switcher-text-layout",
+      layoutKey: "the-switcher-find-layout",
     });
     this.modalEl.addClass("the-switcher-text");
+    // The size of when the preview was beside the results does not fit under them
+    this.app.saveLocalStorage("the-switcher-text-layout", null);
     this.texts = texts;
 
     const { vault, workspace } = this.app;
@@ -89,7 +91,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
     );
     this.onExcludeChange();
 
-    // The results on the left, the preview of the selected one on the right
+    // The results, and under them the preview of the selected one
     const bodyEl = createDiv({ cls: "the-switcher-body" });
     this.resultContainerEl.before(bodyEl);
     bodyEl.appendChild(this.resultContainerEl);
@@ -98,7 +100,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
     makeDraggable(dividerEl, {
       start: () => bodyEl.getBoundingClientRect(),
       move: (body, _dx, _dy, evt) => {
-        this.layout.split = dragSplit(evt.clientX, body.left, body.width);
+        this.layout.split = dragSplit(evt.clientY, body.top, body.height);
         this.applyLayout();
       },
       end: () => this.saveLayout(),

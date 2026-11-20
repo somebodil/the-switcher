@@ -37,10 +37,19 @@ export class FileModal extends SwitcherModal<Hit> {
     el.addClass("mod-complex");
 
     const contentEl = el.createDiv({ cls: "suggestion-content" });
-    const titleEl = contentEl.createDiv({ cls: "suggestion-title" });
+    const titleEl = contentEl.createDiv({ cls: "suggestion-title the-switcher-file" });
     appendSegments(titleEl.createSpan({ cls: "the-switcher-name" }), view.name);
     if (view.extension !== null) {
       titleEl.createSpan({ cls: "the-switcher-ext", text: view.extension });
+    }
+    // The path gives way before the name does, and its first part before its last
+    const { outer, inner } = view.folder;
+    if (inner !== "") {
+      const pathEl = titleEl.createSpan({ cls: "the-switcher-path" });
+      if (outer !== "") {
+        pathEl.createSpan({ cls: "the-switcher-path-outer", text: outer });
+      }
+      pathEl.createSpan({ cls: "the-switcher-path-inner", text: inner });
     }
     if (view.aliases.length > 0) {
       const noteEl = contentEl.createDiv({ cls: "suggestion-note" });
@@ -53,11 +62,6 @@ export class FileModal extends SwitcherModal<Hit> {
         );
       }
     }
-
-    const auxEl = el.createDiv({ cls: "suggestion-aux" });
-    const folderEl = auxEl.createSpan({ cls: "the-switcher-folder" });
-    setIcon(folderEl.createSpan({ cls: "the-switcher-icon" }), "folder");
-    folderEl.createSpan({ text: view.folderName });
   }
 
   protected onExcludeChange(): void {

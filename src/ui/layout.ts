@@ -7,7 +7,7 @@ export interface Layout {
   width?: number;
   /** Height of the dialog in pixels */
   height?: number;
-  /** How much of the width the results take, from 0 to 1. The preview takes the rest. */
+  /** How much of the height the results take, from 0 to 1. The preview under them takes the rest. */
   split?: number;
 }
 
@@ -15,8 +15,8 @@ export const MIN_WIDTH = 360;
 export const MIN_HEIGHT = 240;
 export const MIN_SPLIT = 0.15;
 export const MAX_SPLIT = 0.85;
-/** The least width in pixels of the results and of the preview, while both fit */
-export const MIN_PANE = 140;
+/** The least height in pixels of the results and of the preview, while both fit */
+export const MIN_PANE = 80;
 
 function clamp(value: number, min: number, max: number): number {
   // A window that is smaller than the least size still gets the least size
@@ -76,21 +76,21 @@ export function dragHeight(
 }
 
 /**
- * Works out how much of the width the results take while the line between
- * them and the preview is dragged. In a narrow dialog a share of the width is
+ * Works out how much of the height the results take while the line between
+ * them and the preview is dragged. In a low dialog a share of the height is
  * too little to read, so neither of them gets less than `MIN_PANE` either.
  *
- * @param x where the pointer is
- * @param left where the results start
- * @param width the width of the results and the preview together
+ * @param y where the pointer is
+ * @param top where the results start
+ * @param height the height of the results and the preview together
  */
-export function dragSplit(x: number, left: number, width: number): number {
-  if (width < 2 * MIN_PANE) {
-    // Too narrow for both to get their least width. They share what there is.
+export function dragSplit(y: number, top: number, height: number): number {
+  if (height < 2 * MIN_PANE) {
+    // Too low for both to get their least height. They share what there is.
     return 0.5;
   }
-  const least = Math.max(MIN_SPLIT, MIN_PANE / width);
-  const most = Math.min(MAX_SPLIT, 1 - MIN_PANE / width);
-  const split = clamp((x - left) / width, least, most);
+  const least = Math.max(MIN_SPLIT, MIN_PANE / height);
+  const most = Math.min(MAX_SPLIT, 1 - MIN_PANE / height);
+  const split = clamp((y - top) / height, least, most);
   return Math.round(split * 1000) / 1000;
 }

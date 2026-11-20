@@ -79,7 +79,7 @@ describe("dragHeight", () => {
 });
 
 describe("dragSplit", () => {
-  it("is the part of the width that is left of the pointer", () => {
+  it("is the part of the height that is above the pointer", () => {
     assert.equal(dragSplit(400, 100, 1000), 0.3);
   });
 
@@ -88,13 +88,13 @@ describe("dragSplit", () => {
     assert.equal(dragSplit(5000, 100, 1000), MAX_SPLIT);
   });
 
-  it("leaves each of them a least width in a narrow dialog", () => {
-    assert.equal(dragSplit(0, 100, 400), MIN_PANE / 400);
-    assert.equal(dragSplit(5000, 100, 400), 1 - MIN_PANE / 400);
-    assert.equal(dragSplit(300, 100, 400), 0.5);
+  it("leaves each of them a least height in a low dialog", () => {
+    assert.equal(dragSplit(0, 100, 320), MIN_PANE / 320);
+    assert.equal(dragSplit(5000, 100, 320), 1 - MIN_PANE / 320);
+    assert.equal(dragSplit(260, 100, 320), 0.5);
   });
 
-  it("halves a dialog that is too narrow for the least widths", () => {
+  it("halves a dialog that is too low for the least heights", () => {
     assert.equal(dragSplit(0, 100, 2 * MIN_PANE - 1), 0.5);
     assert.equal(dragSplit(400, 100, 0), 0.5);
   });

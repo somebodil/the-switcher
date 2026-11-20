@@ -156,17 +156,80 @@
   white-space: nowrap;
 }
 
-/* A file: its name, the aliases that matched, and its folder */
+/*
+ * A file: its name and the path of its folder, and under them the aliases that
+ * matched. The name gets the room it needs first, and the path what is left.
+ * A share of the room for each would cut a name by a part of a pixel, and
+ * that is enough for an ellipsis.
+ */
+.the-switcher-files .suggestion-content {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.the-switcher-file {
+  display: grid;
+  grid-template-columns: minmax(0, max-content) auto minmax(0, 1fr);
+  align-items: baseline;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 .the-switcher-name {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-weight: var(--font-semibold);
 }
 
 .the-switcher-ext {
+  grid-column: 2;
   margin-inline-start: var(--size-2-3);
   padding: 0 var(--size-2-3);
   border-radius: var(--radius-s);
   background-color: var(--background-modifier-hover);
   font-size: var(--font-ui-smaller);
+}
+
+.the-switcher-path {
+  display: flex;
+  grid-column: 3;
+  min-width: 0;
+  margin-inline-start: var(--size-4-2);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  container-type: inline-size;
+}
+
+/* Room for a letter or two of the path says nothing, and looks like a mistake */
+@container (max-width: 3em) {
+  .the-switcher-path-outer,
+  .the-switcher-path-inner {
+    display: none;
+  }
+}
+
+/*
+ * A path that is too long is cut in its middle: the folders around the
+ * innermost one give way, and end in an ellipsis. The innermost folder is cut
+ * only when it does not fit by itself.
+ */
+.the-switcher-path-outer,
+.the-switcher-path-inner {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.the-switcher-path-outer {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.the-switcher-path-inner {
+  flex: none;
+  max-width: 100%;
 }
 
 .the-switcher-alias {
@@ -176,27 +239,32 @@
   margin-inline-end: var(--size-4-2);
 }
 
-.the-switcher-folder {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--size-2-1);
-}
-
-/* Finding text: the matching lines on the left, the note around the selected line on the right */
+/*
+ * Finding text: the matching lines, and under them the note around the selected
+ * line. The two are one above the other, so this dialog may be higher than
+ * other dialogs: as high as a dialog gets when the mouse makes it higher.
+ */
 .the-switcher-text.prompt {
-  --the-switcher-default-width: min(1200px, 92vw);
+  --the-switcher-default-width: min(900px, 92vw);
+  max-height: calc(100vh - var(--the-switcher-top) - var(--the-switcher-window-margin));
 }
 
+/* In a low window the dialog ends where it has to, and this is what gives way */
 .the-switcher-body {
   display: flex;
-  height: min(60vh, 640px);
+  flex-direction: column;
+  height: min(72vh, 760px);
   min-height: 0;
 }
 
-/* In a narrow dialog a share of the width is too little to read, so both keep a least width */
+/*
+ * In a low dialog a share of the height is too little to read, so both keep a
+ * least height. When there is not even room for that, each gets half of what
+ * the line between them leaves.
+ */
 .the-switcher-body > .prompt-results {
-  flex: 0 1 var(--the-switcher-split, 42%);
-  min-width: min(140px, 50%);
+  flex: 0 1 var(--the-switcher-split, 40%);
+  min-height: min(80px, 50% - 3px);
   max-height: none;
   overflow-y: auto;
 }
@@ -242,8 +310,8 @@
   flex: 0 0 5px;
   background-color: var(--background-modifier-border);
   background-clip: content-box;
-  padding: 0 2px;
-  cursor: col-resize;
+  padding: 2px 0;
+  cursor: row-resize;
   transition: background-color 100ms ease-in-out;
 }
 
@@ -256,7 +324,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  min-width: min(140px, 50%);
+  min-height: min(80px, 50% - 3px);
 }
 
 .the-switcher-preview-path {

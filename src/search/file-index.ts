@@ -46,10 +46,22 @@ export interface HitView {
   name: Segment[];
   /** The extension, or null for a Markdown file */
   extension: string | null;
-  /** Name of the folder that holds the file */
-  folderName: string;
+  /** Path of the folder that holds the file */
+  folder: FolderView;
   /** The aliases that the terms match, cut where they match */
   aliases: Segment[][];
+}
+
+/**
+ * The path of a folder in two parts. A row that is too narrow for the path
+ * cuts the first part, so that the path is shortened in its middle: the
+ * outermost folders and the innermost one are the ones that tell where a file is.
+ */
+export interface FolderView {
+  /** The folders around the innermost one. Empty if there are none. */
+  outer: string;
+  /** The innermost folder, after a "/" if it is in another. Empty in the root of the vault. */
+  inner: string;
 }
 
 const NOT_RECENT = Number.MAX_SAFE_INTEGER;
@@ -221,6 +233,15 @@ export class FileIndex {
   }
 }
 
+function toFolderView(folder: string): FolderView {
+  // The root of the vault is "/", and a file in it has no folder to show
+  const path = folder === "/" ? "" : folder;
+  const slash = path.lastIndexOf("/");
+  return slash === -1
+    ? { outer: "", inner: path }
+    : { outer: path.slice(0, slash), inner: path.slice(slash) };
+}
+
 /** Works out how to show a hit: where the terms match its name and its aliases. */
 export function describe(hit: Hit, terms: Term[]): HitView {
   const { file } = hit.entry;
@@ -235,7 +256,7 @@ export function describe(hit: Hit, terms: Term[]): HitView {
     // what falls on the extension, which is shown apart from the name.
     name: toSegments(file.basename, rangesIn(searchableName(file))),
     extension: file.extension === "md" ? null : file.extension,
-    folderName: file.folder.split("/").pop() ?? "",
+    folder: toFolderView(file.folder),
     aliases: file.aliases
       .map((alias) => ({ alias, ranges: rangesIn(alias) }))
       .filter(({ ranges }) => ranges.length > 0)
