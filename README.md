@@ -156,6 +156,12 @@ npm run build   # type check, then the main.js of a release
 
 To try a build, copy `main.js`, `manifest.json`, and `styles.css` to `.obsidian/plugins/the-switcher/` in a vault.
 
+A release is built by GitHub Actions when a tag with the version of `manifest.json` is pushed. The message of the tag becomes the notes of the release. The files of a release come with an [artifact attestation](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations/using-artifact-attestations-to-establish-provenance-for-builds), a signed statement that they were built from this repository:
+
+```bash
+gh attestation verify main.js --repo somebodil/the-switcher
+```
+
 ## Acknowledgements
 
 - Inspired by Go to File and Find in Files in [IntelliJ IDEA](https://www.jetbrains.com/idea/).
