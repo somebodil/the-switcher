@@ -5,6 +5,13 @@
 .the-switcher.prompt {
   --the-switcher-default-width: min(var(--prompt-width), var(--prompt-max-width));
   --the-switcher-window-margin: 16px;
+  /*
+   * As far from the top as from the bottom when a dialog is as high as it gets
+   * by itself. Obsidian 1.15 puts a dialog there, and Obsidian 1.12 puts it 80px
+   * from the top. The heights below count on this place, so it is said here.
+   */
+  --the-switcher-top: calc((100vh - var(--prompt-max-height)) / 2);
+  top: var(--the-switcher-top);
   width: min(
     var(--the-switcher-width, var(--the-switcher-default-width)),
     calc(100vw - 2 * var(--the-switcher-window-margin))
@@ -12,11 +19,11 @@
   max-width: none;
 }
 
-/* A dialog starts as far from the top as from the bottom when it is as high as it gets by itself */
+/* A dialog that the mouse made higher ends a margin above the lower side of the window at the latest */
 .the-switcher.prompt.is-tall {
   height: min(
     var(--the-switcher-height),
-    calc(100vh - (100vh - var(--prompt-max-height)) / 2 - var(--the-switcher-window-margin))
+    calc(100vh - var(--the-switcher-top) - var(--the-switcher-window-margin))
   );
   max-height: none;
 }

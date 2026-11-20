@@ -257,11 +257,16 @@ export function toSnippet(match: LineMatch, length: number): Snippet {
   const isCut = firstMatch - indentation > length - SNIPPET_LEAD;
   const start = isCut ? firstMatch - SNIPPET_LEAD : indentation;
   const prefix = isCut ? ELLIPSIS : "";
+  const end = Math.min(start + length, match.text.length);
   const shift = prefix.length - start;
   return {
-    text: prefix + match.text.slice(start, start + length),
+    text: prefix + match.text.slice(start, end),
+    // A match that reaches into the indentation or past the cut keeps the part that is shown
     ranges: match.ranges
-      .filter((range) => range.start >= start)
-      .map((range) => ({ start: range.start + shift, end: range.end + shift })),
+      .filter((range) => range.end > start && range.start < end)
+      .map((range) => ({
+        start: Math.max(range.start, start) + shift,
+        end: Math.min(range.end, end) + shift,
+      })),
   };
 }

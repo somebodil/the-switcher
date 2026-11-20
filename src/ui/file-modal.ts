@@ -27,8 +27,7 @@ export class FileModal extends SwitcherModal<Hit> {
   }
 
   getSuggestions(query: string): Hit[] {
-    const currentFolder = this.app.workspace.getActiveFile()?.parent?.path ?? "";
-    this.terms = parseQuery(query, currentFolder);
+    this.terms = parseQuery(query);
     const hits = this.index.search(this.terms);
     return this.show(hits.slice(0, MAX_RESULTS), hits.length);
   }

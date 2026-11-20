@@ -377,6 +377,33 @@ describe("toSnippet", () => {
     });
   });
 
+  it("keeps the part of a match that starts in the indentation", () => {
+    assert.deepEqual(toSnippet(match("    - a fox", " - "), 80), {
+      text: "- a fox",
+      ranges: [{ start: 0, end: 2 }],
+    });
+    assert.deepEqual(toSnippet(match("\t\tfox", "\tfox"), 80), {
+      text: "fox",
+      ranges: [{ start: 0, end: 3 }],
+    });
+  });
+
+  it("leaves out a match that is all in the indentation", () => {
+    assert.deepEqual(toSnippet(match("    fox", "  "), 80), {
+      text: "fox",
+      ranges: [],
+    });
+  });
+
+  it("keeps the part of a match that the cut goes through, and leaves out what comes after", () => {
+    const snippet = toSnippet(match(`fox ${"x".repeat(44)}fox fox`, "fox"), 50);
+    assert.equal(snippet.text, `fox ${"x".repeat(44)}fo`);
+    assert.deepEqual(snippet.ranges, [
+      { start: 0, end: 3 },
+      { start: 48, end: 50 },
+    ]);
+  });
+
   it("cuts a long line after the given number of characters", () => {
     const snippet = toSnippet(match(`fox ${"x".repeat(200)}`, "fox"), 50);
     assert.equal(snippet.text.length, 50);

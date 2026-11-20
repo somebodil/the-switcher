@@ -58,7 +58,6 @@ Words are separated by spaces, and a file has to match all of them. Upper and lo
 | `-alpha`       | Everything except what `alpha` matches                                   |
 | `Notes/`       | Files in a folder whose path has `Notes`                                 |
 | `Notes/alpha`  | Of those, the files with `alpha` in the name or in an alias              |
-| `<cd>`         | Stands for the folder of the file you are looking at, as in `<cd>/alpha` |
 
 - Files other than Markdown notes show their extension and are found by it. `png` lists the PNG images.
 - When a word matches an alias, that alias is shown under the name.
@@ -98,7 +97,7 @@ Both dialogs have the same keys. `Mod` is `Ctrl` on Windows and Linux, and `Cmd`
 
 | Key                      | What it does             |
 | ------------------------ | ------------------------ |
-| `↑` `↓`, `Mod+P` `Mod+N` | Move through the results |
+| `↑` `↓`                  | Move through the results |
 | `Enter`                  | Open in the current tab  |
 | `Mod+Enter`              | Open in a new tab        |
 | `Mod+E`                  | Go to the exclude input  |
@@ -165,7 +164,7 @@ gh attestation verify main.js --repo somebodil/the-switcher
 ## Acknowledgements
 
 - Inspired by Go to File and Find in Files in [IntelliJ IDEA](https://www.jetbrains.com/idea/).
-- Some ideas for the query of Go to file, such as `<cd>` for the folder of the file you are looking at, come from [Another Quick Switcher](https://github.com/tadashi-aikawa/obsidian-another-quick-switcher) by Tadashi Aikawa. The Switcher shares no code with it.
+- Some ideas for the query of Go to file come from [Another Quick Switcher](https://github.com/tadashi-aikawa/obsidian-another-quick-switcher) by Tadashi Aikawa. The Switcher shares no code with it.
 
 ## License
 

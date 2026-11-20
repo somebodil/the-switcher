@@ -60,15 +60,4 @@ describe("parseQuery", () => {
       { text: "notes/", folders: ["notes"], name: "", negated: false },
     ]);
   });
-
-  it("puts the current folder in place of <cd>", () => {
-    assert.deepEqual(parseQuery("<cd>/al", "Notes/Sub"), [
-      {
-        text: "notes/sub/al",
-        folders: ["notes", "sub"],
-        name: "al",
-        negated: false,
-      },
-    ]);
-  });
 });

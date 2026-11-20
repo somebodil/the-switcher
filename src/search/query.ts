@@ -15,9 +15,6 @@ export interface Term {
   negated: boolean;
 }
 
-/** Stands for the folder of the active file in a query. */
-const CURRENT_FOLDER = "<cd>";
-
 /**
  * Splits a query at spaces. Double quotes keep the spaces between them in the
  * word, and `\"` is a quote character.
@@ -48,14 +45,10 @@ export function splitWords(query: string): string[] {
   return words;
 }
 
-/**
- * Turns a query into terms.
- *
- * @param currentFolder path that replaces `<cd>` in the query
- */
-export function parseQuery(query: string, currentFolder = ""): Term[] {
+/** Turns a query into terms. */
+export function parseQuery(query: string): Term[] {
   const terms: Term[] = [];
-  for (const word of splitWords(query.split(CURRENT_FOLDER).join(currentFolder))) {
+  for (const word of splitWords(query)) {
     const negated = word.startsWith("-");
     const body = negated ? word.slice(1) : word;
     const text = fold(body);

@@ -323,7 +323,7 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
   private bindKeys(): void {
     const mod = Platform.isMacOS ? "⌘" : "ctrl";
     this.setInstructions([
-      { command: `↑↓ ${mod} P N`, purpose: "navigate" },
+      { command: "↑↓", purpose: "navigate" },
       { command: "↵", purpose: "open" },
       { command: `${mod} ↵`, purpose: "new tab" },
       { command: `${mod} E`, purpose: "exclude" },
@@ -343,16 +343,6 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
         action(evt);
         return false;
       };
-    this.scope.register(
-      ["Mod"],
-      "P",
-      unlessComposing(() => this.moveSelection("ArrowUp")),
-    );
-    this.scope.register(
-      ["Mod"],
-      "N",
-      unlessComposing(() => this.moveSelection("ArrowDown")),
-    );
     // The key event has the modifier, which is what asks for a new tab
     this.scope.register(
       ["Mod"],
