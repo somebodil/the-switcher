@@ -37,19 +37,24 @@ export class FileModal extends SwitcherModal<Hit> {
     el.addClass("mod-complex");
 
     const contentEl = el.createDiv({ cls: "suggestion-content" });
+    // The full path of the file. The name comes first here and is shown last,
+    // so that a row that is too narrow drops folders and never the name.
     const titleEl = contentEl.createDiv({ cls: "suggestion-title the-switcher-file" });
-    appendSegments(titleEl.createSpan({ cls: "the-switcher-name" }), view.name);
+    const nameEl = titleEl.createSpan({ cls: "the-switcher-name" });
+    appendSegments(nameEl.createSpan({ cls: "the-switcher-name-text" }), view.name);
     if (view.extension !== null) {
-      titleEl.createSpan({ cls: "the-switcher-ext", text: view.extension });
+      nameEl.createSpan({ cls: "the-switcher-ext", text: `.${view.extension}` });
     }
-    // The path gives way before the name does, and its first part before its last
     const { outer, inner } = view.folder;
     if (inner !== "") {
       const pathEl = titleEl.createSpan({ cls: "the-switcher-path" });
+      const foldersEl = pathEl.createSpan({ cls: "the-switcher-path-folders" });
       if (outer !== "") {
-        pathEl.createSpan({ cls: "the-switcher-path-outer", text: outer });
+        foldersEl.createSpan({ cls: "the-switcher-path-outer", text: outer });
       }
-      pathEl.createSpan({ cls: "the-switcher-path-inner", text: inner });
+      foldersEl.createSpan({ cls: "the-switcher-path-inner", text: inner });
+      // The slash before the name stays when the folders are cut
+      pathEl.createSpan({ cls: "the-switcher-path-slash", text: "/" });
     }
     if (view.aliases.length > 0) {
       const noteEl = contentEl.createDiv({ cls: "suggestion-note" });

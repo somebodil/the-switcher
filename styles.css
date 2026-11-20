@@ -144,7 +144,11 @@
   white-space: nowrap;
 }
 
-/* What every result has: the highlighted matches, and what is shown on the right */
+/* What every result has: its size, the highlighted matches, and what is shown on the right */
+.the-switcher .suggestion-item {
+  font-size: var(--font-ui-small);
+}
+
 .the-switcher-hit {
   color: var(--text-accent);
 }
@@ -157,10 +161,14 @@
 }
 
 /*
- * A file: its name and the path of its folder, and under them the aliases that
- * matched. The name gets the room it needs first, and the path what is left.
- * A share of the room for each would cut a name by a part of a pixel, and
- * that is enough for an ellipsis.
+ * A file: its full path, and under it the aliases that matched. The folders
+ * are less bright than the name, which is what the query is about.
+ *
+ * In a row that is too narrow the name stays and the folders give way. For
+ * that the name is the first item of a row that is filled from the right: the
+ * folders go to a second line, which is out of sight, when there is no room
+ * for a few letters of them next to the name. Until then they take what the
+ * name leaves.
  */
 .the-switcher-files .suggestion-content {
   flex: 1 1 0;
@@ -168,16 +176,26 @@
 }
 
 .the-switcher-file {
-  display: grid;
-  grid-template-columns: minmax(0, max-content) auto minmax(0, 1fr);
+  display: flex;
+  flex-flow: row-reverse wrap;
   align-items: baseline;
+  justify-content: flex-end;
   min-width: 0;
+  height: 1.5em;
+  height: 1lh;
   overflow: hidden;
   white-space: nowrap;
 }
 
 .the-switcher-name {
-  grid-column: 1;
+  display: flex;
+  flex: 0 1 auto;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.the-switcher-name-text {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -185,37 +203,35 @@
 }
 
 .the-switcher-ext {
-  grid-column: 2;
-  margin-inline-start: var(--size-2-3);
-  padding: 0 var(--size-2-3);
-  border-radius: var(--radius-s);
-  background-color: var(--background-modifier-hover);
-  font-size: var(--font-ui-smaller);
+  flex: none;
+  color: var(--text-muted);
 }
 
 .the-switcher-path {
   display: flex;
-  grid-column: 3;
+  flex: 1 1 3em;
   min-width: 0;
-  margin-inline-start: var(--size-4-2);
+  max-width: max-content;
   color: var(--text-muted);
-  font-size: var(--font-ui-smaller);
-  container-type: inline-size;
-}
-
-/* Room for a letter or two of the path says nothing, and looks like a mistake */
-@container (max-width: 3em) {
-  .the-switcher-path-outer,
-  .the-switcher-path-inner {
-    display: none;
-  }
 }
 
 /*
  * A path that is too long is cut in its middle: the folders around the
  * innermost one give way, and end in an ellipsis. The innermost folder is cut
- * only when it does not fit by itself.
+ * only when it does not fit by itself. On each level only one part gives way.
+ * Two that share what is missing would each lose a part of a pixel, and that
+ * is enough for an ellipsis.
  */
+.the-switcher-path-folders {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.the-switcher-path-slash {
+  flex: none;
+}
+
 .the-switcher-path-outer,
 .the-switcher-path-inner {
   overflow: hidden;

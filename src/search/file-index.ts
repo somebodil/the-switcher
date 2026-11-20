@@ -53,9 +53,10 @@ export interface HitView {
 }
 
 /**
- * The path of a folder in two parts. A row that is too narrow for the path
- * cuts the first part, so that the path is shortened in its middle: the
- * outermost folders and the innermost one are the ones that tell where a file is.
+ * The path of a folder in two parts, as it is shown in front of the name of a
+ * file. A row that is too narrow for the path cuts the first part, so that the
+ * path is shortened in its middle: the outermost folders and the innermost one
+ * are the ones that tell where a file is.
  */
 export interface FolderView {
   /** The folders around the innermost one. Empty if there are none. */
