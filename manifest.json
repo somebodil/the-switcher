@@ -1,0 +1,10 @@
+{
+  "id": "the-switcher",
+  "name": "The Switcher",
+  "version": "1.0.0",
+  "minAppVersion": "1.7.2",
+  "description": "Go to a file by its name or find text in your notes, and hide paths you never want to see with regular expressions.",
+  "author": "somebodil",
+  "authorUrl": "https://github.com/somebodil",
+  "isDesktopOnly": true
+}

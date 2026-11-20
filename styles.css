@@ -1,0 +1,178 @@
+/* The row between the query and the results: what to exclude, and how many results are listed */
+.the-switcher-status {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-2-2) var(--size-4-4);
+  border-bottom: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+}
+
+.the-switcher-icon {
+  --icon-size: var(--icon-s);
+  display: inline-flex;
+}
+
+.the-switcher-status input.the-switcher-exclude {
+  flex: 1;
+  min-width: 0;
+  height: auto;
+  padding: var(--size-2-1) var(--size-2-2);
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  color: var(--text-normal);
+  font-family: var(--font-monospace);
+  font-size: var(--font-ui-small);
+}
+
+.the-switcher-status input.the-switcher-exclude:focus,
+.the-switcher-status input.the-switcher-exclude:hover {
+  border: none;
+  box-shadow: none;
+}
+
+.the-switcher-status input.the-switcher-exclude::placeholder {
+  color: var(--text-faint);
+}
+
+.the-switcher-status input.the-switcher-exclude.is-invalid {
+  color: var(--text-error);
+}
+
+.the-switcher-count {
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* What every result has: the highlighted matches, and on the right the number that opens it */
+.the-switcher-hit {
+  color: var(--text-accent);
+}
+
+.the-switcher .suggestion-aux {
+  gap: var(--size-4-2);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
+}
+
+.the-switcher-number {
+  color: var(--text-faint);
+}
+
+.the-switcher-number::before {
+  content: "[";
+}
+
+.the-switcher-number::after {
+  content: "]";
+}
+
+/* A file: its name, the aliases that matched, and its folder */
+.the-switcher-name {
+  font-weight: var(--font-semibold);
+}
+
+.the-switcher-ext {
+  margin-inline-start: var(--size-2-3);
+  padding: 0 var(--size-2-3);
+  border-radius: var(--radius-s);
+  background-color: var(--background-modifier-hover);
+  font-size: var(--font-ui-smaller);
+}
+
+.the-switcher-alias {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-1);
+  margin-inline-end: var(--size-4-2);
+}
+
+.the-switcher-folder {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-1);
+}
+
+/* Finding text: the matching lines on the left, the note around the selected line on the right */
+.the-switcher-text.prompt {
+  width: min(1200px, 92vw);
+  max-width: none;
+}
+
+.the-switcher-body {
+  display: flex;
+  height: min(60vh, 640px);
+  min-height: 0;
+}
+
+.the-switcher-body > .prompt-results {
+  flex: 0 0 42%;
+  min-width: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.the-switcher-line {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.the-switcher-text .suggestion-content {
+  min-width: 0;
+}
+
+.the-switcher-preview {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  border-inline-start: 1px solid var(--background-modifier-border);
+}
+
+.the-switcher-preview-path {
+  padding: var(--size-2-3) var(--size-4-3);
+  border-bottom: 1px solid var(--background-modifier-border);
+  color: var(--text-muted);
+  font-size: var(--font-ui-smaller);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.the-switcher-preview-lines {
+  position: relative;
+  flex: 1;
+  overflow: auto;
+  padding: var(--size-2-3) 0;
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-normal);
+}
+
+.the-switcher-preview-line {
+  display: flex;
+  padding-inline-end: var(--size-4-3);
+}
+
+.the-switcher-preview-line.is-match {
+  background-color: var(--background-modifier-hover);
+}
+
+.the-switcher-preview-number {
+  flex: 0 0 3.5em;
+  padding-inline-end: var(--size-4-2);
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+  user-select: none;
+}
+
+.the-switcher-preview-text {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
