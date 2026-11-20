@@ -16,16 +16,22 @@ There are no settings. Everything the plugin does is on this page.
 
 ## Installation
 
-The Switcher is not in the community plugin directory of Obsidian, so you install it by hand.
+The Switcher is in the community plugin directory of Obsidian.
+
+1. In Obsidian, go to **Settings → Community plugins**. If community plugins are still turned off, turn them on.
+2. Select **Browse** and search for **The Switcher**.
+3. Select **Install**, and then **Enable**.
+
+Obsidian tells you when there is a newer version, and installs it for you.
+
+### By hand
 
 1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/somebodil/the-switcher/releases/latest).
 2. In your vault, create the folder `.obsidian/plugins/the-switcher/` and put the three files in it. `.obsidian` is a hidden folder.
 3. Restart Obsidian.
-4. Go to **Settings → Community plugins**. If community plugins are still turned off, turn them on. Then switch on **The Switcher** in the list of installed plugins.
+4. Go to **Settings → Community plugins** and switch on **The Switcher** in the list of installed plugins.
 
 To update, replace the three files with the ones from a newer release and restart Obsidian.
-
-If you use [BRAT](https://github.com/TfTHacker/obsidian42-brat), it can install and update the plugin for you: add `somebodil/the-switcher` as a beta plugin.
 
 ## Getting started
 
