@@ -16,13 +16,7 @@ export default class TheSwitcherPlugin extends Plugin {
   private readonly noteTexts = new NoteTexts();
 
   override async onload(): Promise<void> {
-    const saved = (await this.loadData()) as Partial<PluginData> | null;
-    for (const key of ["fileExclude", "textExclude"] as const) {
-      const value = saved?.[key];
-      if (typeof value === "string") {
-        this.data[key] = value;
-      }
-    }
+    await this.readData();
 
     this.addCommand({
       id: "go-to-file",
@@ -42,6 +36,24 @@ export default class TheSwitcherPlugin extends Plugin {
         ).open();
       },
     });
+  }
+
+  /**
+   * Called by Obsidian when data.json is changed by something else: a sync, a
+   * version control tool, an editor. Without it the old values would stay in
+   * use, and the next save would write them over the change.
+   */
+  override async onExternalSettingsChange(): Promise<void> {
+    await this.readData();
+  }
+
+  private async readData(): Promise<void> {
+    const saved = (await this.loadData()) as Partial<PluginData> | null;
+    const read = (key: keyof PluginData): string => {
+      const value = saved?.[key];
+      return typeof value === "string" ? value : "";
+    };
+    this.data = { fileExclude: read("fileExclude"), textExclude: read("textExclude") };
   }
 
   private excludeOptions(key: keyof PluginData) {

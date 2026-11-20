@@ -197,10 +197,9 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
     const rules = parseExcludeRules(this.excludeEl.value);
     this.excludeEl.toggleClass("is-invalid", rules.hasInvalid);
     this.saveSoon();
-    if (rules.hasInvalid) {
-      // A pattern is still being typed. The results stay as they are until it is valid.
-      return;
-    }
+    // A pattern that is not valid is left out and the others still apply, the
+    // same as when the dialog opens. Otherwise one such pattern would keep
+    // every later change from showing until the dialog is opened again.
     this.excludePatterns = rules.patterns;
     this.onExcludeChange();
     this.refresh();

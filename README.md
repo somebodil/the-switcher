@@ -117,10 +117,10 @@ The input under the query is the exclude input. It takes JavaScript regular expr
 
 - **It stays.** What you type is saved and is there the next time, also after Obsidian restarts. Empty the input to see everything again.
 - **Each dialog has its own.** Hiding a path in one dialog does not hide it in the other.
-- **A pattern in the making does no harm.** While a pattern is not a valid regular expression, the input turns red and the results stay as they were.
+- **A pattern in the making does no harm.** While a pattern is not a valid regular expression, the input turns red and that pattern is left out. The other patterns still apply. `*.png` is such a pattern: a regular expression cannot start with `*`, so write `\.png$`.
 - **A comma can be part of a pattern.** It is not a separator when it is escaped (`\,`), inside square brackets (`[a,b]`), or inside a quantifier (`{1,3}`).
 
-The two exclude inputs are all the plugin saves. They are kept as `fileExclude` and `textExclude` in the `data.json` of the plugin.
+The two exclude inputs are all the plugin saves. They are kept as `fileExclude` and `textExclude` in the `data.json` of the plugin. When that file is changed from outside Obsidian, by a sync or by hand, the dialogs use the new values the next time they open.
 
 ## Development
 
