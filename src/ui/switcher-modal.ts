@@ -3,6 +3,7 @@ import {
   debounce,
   type Debouncer,
   Keymap,
+  type KeymapEventHandler,
   type KeymapEventListener,
   MarkdownView,
   Platform,
@@ -13,9 +14,11 @@ import {
 } from "obsidian";
 import { parseExcludeRules } from "../search/exclude.ts";
 import type { Range, Segment } from "../search/highlight.ts";
+import { makeDraggable } from "./drag.ts";
+import { dragHeight, dragWidth, type Layout, readLayout } from "./layout.ts";
 
 /** Where a chosen result opens. */
-export type Target = "current" | "tab" | "below" | "right" | "window";
+export type Target = "current" | "tab";
 
 /** A place in a note to go to after it opens. */
 export interface Place {
@@ -31,15 +34,45 @@ export interface SwitcherOptions {
   excludeInput: string;
   /** Keeps the exclude input for the next time */
   saveExcludeInput: (value: string) => Promise<void>;
+  /** Name under which the size of the dialog is kept on this device */
+  layoutKey: string;
 }
+
+/** What a dialog is told by the plugin. The rest is up to the dialog. */
+export type DialogOptions = Pick<
+  SwitcherOptions,
+  "excludeInput" | "saveExcludeInput"
+>;
 
 export const MAX_RESULTS = 50;
 /** How long after the last keystroke the exclude input is saved */
 const SAVE_DELAY_MS = 1000;
+/** How much of the window stays free around a dialog that is as large as it gets */
+const WINDOW_MARGIN = 16;
+
+/** The handles that change the size of a dialog: which side they move, and if they move the lower side */
+const RESIZE_HANDLES: { name: string; side?: "left" | "right"; lower?: boolean }[] =
+  [
+    { name: "left", side: "left" },
+    { name: "right", side: "right" },
+    { name: "bottom", lower: true },
+    { name: "bottom-left", side: "left", lower: true },
+    { name: "bottom-right", side: "right", lower: true },
+  ];
+
+/** The size of a dialog and the room it has, when a drag starts. */
+interface Measures {
+  width: number;
+  height: number;
+  /** True if the dialog is in the middle of the window, from left to right */
+  centered: boolean;
+  maxWidth: number;
+  maxHeight: number;
+}
 
 /**
  * What the dialogs of the plugin share: the exclude input, the number of
- * results, the keys, and the places a result can open in.
+ * results, the keys, and the two places a result can open in.
  */
 export abstract class SwitcherModal<T> extends SuggestModal<T> {
   /** The row between the query and the results */
@@ -52,10 +85,9 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
 
   /** The valid patterns of the exclude input */
   protected excludePatterns: RegExp[];
-  /** The results on screen, to open one by its number */
-  protected shown: T[] = [];
-  /** Set by a key that asks for a certain place, right before a result is chosen */
-  private target: Target | null = null;
+  /** The size that the dialog was given with the mouse */
+  protected layout: Layout;
+  private readonly layoutKey: string;
 
   constructor(app: App, options: SwitcherOptions) {
     super(app);
@@ -88,6 +120,11 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
     this.resultContainerEl.before(this.statusEl);
 
     this.bindKeys();
+
+    this.layoutKey = options.layoutKey;
+    this.layout = readLayout(app.loadLocalStorage(this.layoutKey));
+    this.applyLayout();
+    this.addResizeHandles();
   }
 
   /** Called when the valid patterns of the exclude input change. */
@@ -103,9 +140,7 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
   }
 
   onChooseSuggestion(result: T, evt: MouseEvent | KeyboardEvent): void {
-    const target = this.target ?? targetOf(evt);
-    this.target = null;
-    void this.openResult(result, target);
+    void this.openResult(result, targetOf(evt));
   }
 
   /** Searches again with the query that is in the input. */
@@ -113,9 +148,8 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
     this.inputEl.dispatchEvent(new Event("input"));
   }
 
-  /** Remembers the results that are shown, and tells how many there are of how many. */
+  /** Tells how many results are shown of how many there are. */
   protected show(results: T[], total: number): T[] {
-    this.shown = results;
     this.setStatus(`${results.length} / ${total}`);
     return results;
   }
@@ -124,12 +158,85 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
     this.countEl.setText(text);
   }
 
-  /** Adds the number that opens a result with a key, for the first nine results. */
-  protected appendNumber(el: HTMLElement, result: T): void {
-    const position = this.shown.indexOf(result);
-    if (position >= 0 && position < 9) {
-      el.createSpan({ cls: "the-switcher-number", text: String(position + 1) });
+  /** Gives the dialog the size of the layout. The style sheet does the rest. */
+  protected applyLayout(): void {
+    const { width, height, split } = this.layout;
+    this.setLayoutValue("--the-switcher-width", width, "px");
+    this.setLayoutValue("--the-switcher-height", height, "px");
+    this.setLayoutValue(
+      "--the-switcher-split",
+      split === undefined ? undefined : split * 100,
+      "%",
+    );
+    this.modalEl.toggleClass("is-tall", height !== undefined);
+  }
+
+  /** Keeps the layout on this device. The size of a window is not for other devices. */
+  protected saveLayout(): void {
+    this.app.saveLocalStorage(this.layoutKey, this.layout);
+  }
+
+  private setLayoutValue(
+    name: string,
+    value: number | undefined,
+    unit: string,
+  ): void {
+    if (value === undefined) {
+      this.modalEl.style.removeProperty(name);
+    } else {
+      this.modalEl.setCssProps({ [name]: `${value}${unit}` });
     }
+  }
+
+  /** Adds what the mouse takes hold of to make the dialog wider or higher. */
+  private addResizeHandles(): void {
+    for (const { name, side, lower } of RESIZE_HANDLES) {
+      const handleEl = this.modalEl.createDiv({
+        cls: `the-switcher-resize mod-${name}`,
+      });
+      makeDraggable(handleEl, {
+        start: () => this.measure(),
+        move: (from, dx, dy) => {
+          if (side) {
+            this.layout.width = dragWidth(
+              from.width,
+              dx,
+              side,
+              from.centered,
+              from.maxWidth,
+            );
+          }
+          if (lower) {
+            this.layout.height = dragHeight(from.height, dy, from.maxHeight);
+          }
+          this.applyLayout();
+        },
+        end: () => this.saveLayout(),
+        reset: () => {
+          if (side) {
+            this.layout.width = undefined;
+          }
+          if (lower) {
+            this.layout.height = undefined;
+          }
+          this.applyLayout();
+          this.saveLayout();
+        },
+      });
+    }
+  }
+
+  private measure(): Measures {
+    const dialog = this.modalEl.getBoundingClientRect();
+    const room = this.containerEl.getBoundingClientRect();
+    const middle = (rect: DOMRect): number => rect.left + rect.width / 2;
+    return {
+      width: dialog.width,
+      height: dialog.height,
+      centered: Math.abs(middle(dialog) - middle(room)) < 1,
+      maxWidth: room.width - 2 * WINDOW_MARGIN,
+      maxHeight: room.bottom - dialog.top - WINDOW_MARGIN,
+    };
   }
 
   /** Opens a file where it was asked for, and goes to a place in it if one is given. */
@@ -160,19 +267,11 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
 
   private leafFor(file: TFile, target: Target): WorkspaceLeaf {
     const { workspace } = this.app;
-    switch (target) {
-      case "current":
-        return workspace.getLeaf(false);
-      case "tab":
-        // A file that already has a tab is shown there instead of in a second tab
-        return this.findTabOf(file) ?? workspace.getLeaf("tab");
-      case "below":
-        return workspace.getLeaf("split", "horizontal");
-      case "right":
-        return workspace.getLeaf("split", "vertical");
-      case "window":
-        return workspace.getLeaf("window");
+    if (target === "current") {
+      return workspace.getLeaf(false);
     }
+    // A file that already has a tab is shown there instead of in a second tab
+    return this.findTabOf(file) ?? workspace.getLeaf("tab");
   }
 
   /** Finds a tab that shows the file, leaving out the sidebars. */
@@ -222,13 +321,12 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
       { command: `↑↓ ${mod} P N`, purpose: "navigate" },
       { command: "↵", purpose: "open" },
       { command: `${mod} ↵`, purpose: "new tab" },
-      { command: `${mod} -`, purpose: "split below" },
-      { command: `${mod} I`, purpose: "split right" },
-      { command: `${mod} O`, purpose: "new window" },
-      { command: `${mod} 1-9`, purpose: "open by number" },
       { command: `${mod} E`, purpose: "exclude" },
+      { command: `${mod} S`, purpose: "search" },
       { command: "esc", purpose: "close" },
     ]);
+
+    this.releaseHomeAndEnd();
 
     // A key pressed to finish composing a character (Korean, Japanese, ...) is not a hotkey
     const unlessComposing =
@@ -246,60 +344,57 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
           new KeyboardEvent("keydown", { key, bubbles: true }),
         );
       });
-    const chooseFor = (target: Target) =>
-      unlessComposing((evt) => {
-        this.target = target;
-        this.selectActiveSuggestion(evt);
-      });
 
     this.scope.register(["Mod"], "P", pressArrow("ArrowUp"));
     this.scope.register(["Mod"], "N", pressArrow("ArrowDown"));
-    this.scope.register(["Mod"], "Enter", chooseFor("tab"));
-    this.scope.register(["Mod"], "-", chooseFor("below"));
-    this.scope.register(["Mod"], "I", chooseFor("right"));
-    this.scope.register(["Mod"], "O", chooseFor("window"));
+    // The key event has the modifier, which is what asks for a new tab
+    this.scope.register(
+      ["Mod"],
+      "Enter",
+      unlessComposing((evt) => this.selectActiveSuggestion(evt)),
+    );
     this.scope.register(
       ["Mod"],
       "E",
-      unlessComposing(() => this.toggleExcludeFocus()),
+      unlessComposing(() => {
+        this.excludeEl.focus();
+        this.excludeEl.select();
+      }),
     );
-    for (let number = 1; number <= 9; number++) {
-      this.scope.register(
-        ["Mod"],
-        String(number),
-        unlessComposing((evt) => {
-          const result = this.shown[number - 1];
-          if (result !== undefined) {
-            this.target = "current";
-            this.selectSuggestion(result, evt);
-          }
-        }),
-      );
-    }
+    this.scope.register(
+      ["Mod"],
+      "S",
+      unlessComposing(() => this.inputEl.focus()),
+    );
   }
 
-  private toggleExcludeFocus(): void {
-    if (this.excludeEl.ownerDocument.activeElement === this.excludeEl) {
-      this.inputEl.focus();
-    } else {
-      this.excludeEl.focus();
-      this.excludeEl.select();
+  /**
+   * Gives Home and End back to the inputs, where they move the cursor. The
+   * list of results takes them to jump to its first and its last result.
+   *
+   * A scope hands a key to the handler that was registered first, so a handler
+   * of this dialog could not get ahead of the ones of the list. They have to
+   * be taken out, and the scope does not tell its handlers in the public API.
+   */
+  private releaseHomeAndEnd(): void {
+    const { keys } = this.scope as unknown as { keys?: KeymapEventHandler[] };
+    if (!Array.isArray(keys)) {
+      return;
+    }
+    for (const handler of [...keys]) {
+      if (
+        (handler.key === "Home" || handler.key === "End") &&
+        !handler.modifiers
+      ) {
+        this.scope.unregister(handler);
+      }
     }
   }
 }
 
-/** A click or Enter opens in the current tab, unless the modifier keys ask for another place. */
+/** A click or Enter opens in the current tab, and with the modifier key in a new tab. */
 function targetOf(evt: MouseEvent | KeyboardEvent): Target {
-  switch (Keymap.isModEvent(evt)) {
-    case false:
-      return "current";
-    case "split":
-      return "right";
-    case "window":
-      return "window";
-    default:
-      return "tab";
-  }
+  return Keymap.isModEvent(evt) === false ? "current" : "tab";
 }
 
 /** Adds a text to an element, with its highlighted parts in their own spans. */

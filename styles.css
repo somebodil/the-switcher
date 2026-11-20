@@ -1,3 +1,94 @@
+/*
+ * The size of a dialog. It is as wide as the style sheet says until the mouse
+ * drags a side, and as high as its results until the mouse drags the lower side.
+ */
+.the-switcher.prompt {
+  --the-switcher-default-width: min(var(--prompt-width), var(--prompt-max-width));
+  --the-switcher-window-margin: 16px;
+  width: min(
+    var(--the-switcher-width, var(--the-switcher-default-width)),
+    calc(100vw - 2 * var(--the-switcher-window-margin))
+  );
+  max-width: none;
+}
+
+/* A dialog starts as far from the top as from the bottom when it is as high as it gets by itself */
+.the-switcher.prompt.is-tall {
+  height: min(
+    var(--the-switcher-height),
+    calc(100vh - (100vh - var(--prompt-max-height)) / 2 - var(--the-switcher-window-margin))
+  );
+  max-height: none;
+}
+
+/* Results that are too wide are cut. They do not get a scroll bar from left to right. */
+.the-switcher .prompt-results {
+  overflow-x: hidden;
+}
+
+.the-switcher.is-tall > .prompt-results,
+.the-switcher.is-tall > .the-switcher-body {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
+}
+
+/* What the mouse takes hold of to change the size: the sides, the lower side, and the lower corners */
+.the-switcher-resize {
+  position: absolute;
+  z-index: 2;
+  transition: background-color 100ms ease-in-out;
+}
+
+.the-switcher-resize:hover,
+.the-switcher-resize.is-dragged,
+.the-switcher-divider:hover,
+.the-switcher-divider.is-dragged {
+  background-color: var(--interactive-accent);
+}
+
+.the-switcher-resize.mod-left,
+.the-switcher-resize.mod-right {
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: ew-resize;
+}
+
+.the-switcher-resize.mod-left {
+  left: 0;
+}
+
+.the-switcher-resize.mod-right {
+  right: 0;
+}
+
+.the-switcher-resize.mod-bottom {
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 4px;
+  cursor: ns-resize;
+}
+
+.the-switcher-resize.mod-bottom-left,
+.the-switcher-resize.mod-bottom-right {
+  bottom: 0;
+  z-index: 3;
+  width: 12px;
+  height: 12px;
+}
+
+.the-switcher-resize.mod-bottom-left {
+  left: 0;
+  cursor: nesw-resize;
+}
+
+.the-switcher-resize.mod-bottom-right {
+  right: 0;
+  cursor: nwse-resize;
+}
+
 /* The row between the query and the results: what to exclude, and how many results are listed */
 .the-switcher-status {
   display: flex;
@@ -46,7 +137,7 @@
   white-space: nowrap;
 }
 
-/* What every result has: the highlighted matches, and on the right the number that opens it */
+/* What every result has: the highlighted matches, and what is shown on the right */
 .the-switcher-hit {
   color: var(--text-accent);
 }
@@ -56,18 +147,6 @@
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   white-space: nowrap;
-}
-
-.the-switcher-number {
-  color: var(--text-faint);
-}
-
-.the-switcher-number::before {
-  content: "[";
-}
-
-.the-switcher-number::after {
-  content: "]";
 }
 
 /* A file: its name, the aliases that matched, and its folder */
@@ -98,8 +177,7 @@
 
 /* Finding text: the matching lines on the left, the note around the selected line on the right */
 .the-switcher-text.prompt {
-  width: min(1200px, 92vw);
-  max-width: none;
+  --the-switcher-default-width: min(1200px, 92vw);
 }
 
 .the-switcher-body {
@@ -108,9 +186,10 @@
   min-height: 0;
 }
 
+/* In a narrow dialog a share of the width is too little to read, so both keep a least width */
 .the-switcher-body > .prompt-results {
-  flex: 0 0 42%;
-  min-width: 0;
+  flex: 0 1 var(--the-switcher-split, 42%);
+  min-width: min(140px, 50%);
   max-height: none;
   overflow-y: auto;
 }
@@ -121,16 +200,56 @@
   white-space: nowrap;
 }
 
+/*
+ * A matching line: its text, then the note and the number of the line. The text
+ * keeps at least half of the room, however long the name of the note is and
+ * however narrow the results are made.
+ */
 .the-switcher-text .suggestion-content {
+  flex: 1 1 0;
   min-width: 0;
+}
+
+.the-switcher-text .suggestion-aux {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
+}
+
+.the-switcher-location {
+  display: flex;
+  min-width: 0;
+}
+
+.the-switcher-location-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.the-switcher-location-line {
+  flex: none;
+}
+
+/* The line between the results and the preview. The mouse drags it to give one of them more room. */
+.the-switcher-divider {
+  flex: 0 0 5px;
+  background-color: var(--background-modifier-border);
+  background-clip: content-box;
+  padding: 0 2px;
+  cursor: col-resize;
+  transition: background-color 100ms ease-in-out;
+}
+
+.the-switcher-divider:hover,
+.the-switcher-divider.is-dragged {
+  background-clip: border-box;
 }
 
 .the-switcher-preview {
   display: flex;
   flex: 1;
   flex-direction: column;
-  min-width: 0;
-  border-inline-start: 1px solid var(--background-modifier-border);
+  min-width: min(140px, 50%);
 }
 
 .the-switcher-preview-path {

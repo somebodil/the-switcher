@@ -48,7 +48,15 @@ export default class TheSwitcherPlugin extends Plugin {
   }
 
   private async readData(): Promise<void> {
-    const saved = (await this.loadData()) as Partial<PluginData> | null;
+    const saved = (await this.loadData()) as
+      | Partial<PluginData>
+      | null
+      | undefined;
+    if (saved === undefined) {
+      // The file is there but cannot be read, as when it is caught half
+      // written. What was read before is better than nothing.
+      return;
+    }
     const read = (key: keyof PluginData): string => {
       const value = saved?.[key];
       return typeof value === "string" ? value : "";

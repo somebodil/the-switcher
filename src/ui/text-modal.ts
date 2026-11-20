@@ -3,11 +3,13 @@ import type { NoteTexts } from "../note-texts.ts";
 import { FileIndex } from "../search/file-index.ts";
 import { toSegments } from "../search/highlight.ts";
 import { findAll, type LineMatch, toSnippet } from "../search/text-index.ts";
+import { makeDraggable } from "./drag.ts";
+import { dragSplit } from "./layout.ts";
 import {
   appendSegments,
+  type DialogOptions,
   MAX_RESULTS,
   SwitcherModal,
-  type SwitcherOptions,
   type Target,
 } from "./switcher-modal.ts";
 
@@ -36,9 +38,13 @@ export class TextModal extends SwitcherModal<LineMatch> {
   constructor(
     app: App,
     texts: NoteTexts,
-    options: Omit<SwitcherOptions, "placeholder">,
+    options: DialogOptions,
   ) {
-    super(app, { ...options, placeholder: "Find text in notes" });
+    super(app, {
+      ...options,
+      placeholder: "Find text in notes",
+      layoutKey: "the-switcher-text-layout",
+    });
     this.modalEl.addClass("the-switcher-text");
     this.texts = texts;
 
@@ -60,6 +66,21 @@ export class TextModal extends SwitcherModal<LineMatch> {
     const bodyEl = createDiv({ cls: "the-switcher-body" });
     this.resultContainerEl.before(bodyEl);
     bodyEl.appendChild(this.resultContainerEl);
+    // The line between the two, which the mouse drags to give one of them more room
+    const dividerEl = bodyEl.createDiv({ cls: "the-switcher-divider" });
+    makeDraggable(dividerEl, {
+      start: () => bodyEl.getBoundingClientRect(),
+      move: (body, _dx, _dy, evt) => {
+        this.layout.split = dragSplit(evt.clientX, body.left, body.width);
+        this.applyLayout();
+      },
+      end: () => this.saveLayout(),
+      reset: () => {
+        this.layout.split = undefined;
+        this.applyLayout();
+        this.saveLayout();
+      },
+    });
     this.previewEl = bodyEl.createDiv({ cls: "the-switcher-preview" });
 
     // The selection moves with the arrow keys and the mouse. The list marks it
@@ -112,10 +133,15 @@ export class TextModal extends SwitcherModal<LineMatch> {
     );
 
     const auxEl = el.createDiv({ cls: "suggestion-aux" });
-    this.appendNumber(auxEl, match);
-    auxEl.createSpan({
-      cls: "the-switcher-location",
-      text: `${toBasename(match.path)}:${match.line + 1}`,
+    // The name gives way when there is little room. The number of the line does not.
+    const locationEl = auxEl.createSpan({ cls: "the-switcher-location" });
+    locationEl.createSpan({
+      cls: "the-switcher-location-name",
+      text: toBasename(match.path),
+    });
+    locationEl.createSpan({
+      cls: "the-switcher-location-line",
+      text: `:${match.line + 1}`,
     });
   }
 

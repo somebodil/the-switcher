@@ -3,9 +3,9 @@ import { describe, FileIndex, type Hit } from "../search/file-index.ts";
 import { parseQuery, type Term } from "../search/query.ts";
 import {
   appendSegments,
+  type DialogOptions,
   MAX_RESULTS,
   SwitcherModal,
-  type SwitcherOptions,
   type Target,
 } from "./switcher-modal.ts";
 
@@ -15,8 +15,12 @@ export class FileModal extends SwitcherModal<Hit> {
   /** The terms of the query that the shown results belong to */
   private terms: Term[] = [];
 
-  constructor(app: App, options: Omit<SwitcherOptions, "placeholder">) {
-    super(app, { ...options, placeholder: "Find a file by name" });
+  constructor(app: App, options: DialogOptions) {
+    super(app, {
+      ...options,
+      placeholder: "Find a file by name",
+      layoutKey: "the-switcher-file-layout",
+    });
     this.modalEl.addClass("the-switcher-files");
     this.index = this.buildIndex();
     this.index.exclude(this.excludePatterns);
@@ -52,7 +56,6 @@ export class FileModal extends SwitcherModal<Hit> {
     }
 
     const auxEl = el.createDiv({ cls: "suggestion-aux" });
-    this.appendNumber(auxEl, hit);
     const folderEl = auxEl.createSpan({ cls: "the-switcher-folder" });
     setIcon(folderEl.createSpan({ cls: "the-switcher-icon" }), "folder");
     folderEl.createSpan({ text: view.folderName });
