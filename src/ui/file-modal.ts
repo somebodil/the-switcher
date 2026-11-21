@@ -46,13 +46,19 @@ export class FileModal extends SwitcherModal<Hit> {
       nameEl.createSpan({ cls: "the-switcher-ext", text: `.${view.extension}` });
     }
     const { outer, inner } = view.folder;
-    if (inner !== "") {
+    if (inner.length > 0) {
       const pathEl = titleEl.createSpan({ cls: "the-switcher-path" });
       const foldersEl = pathEl.createSpan({ cls: "the-switcher-path-folders" });
-      if (outer !== "") {
-        foldersEl.createSpan({ cls: "the-switcher-path-outer", text: outer });
+      if (outer.length > 0) {
+        appendSegments(
+          foldersEl.createSpan({ cls: "the-switcher-path-outer" }),
+          outer,
+        );
       }
-      foldersEl.createSpan({ cls: "the-switcher-path-inner", text: inner });
+      appendSegments(
+        foldersEl.createSpan({ cls: "the-switcher-path-inner" }),
+        inner,
+      );
       // The slash before the name stays when the folders are cut
       pathEl.createSpan({ cls: "the-switcher-path-slash", text: "/" });
     }

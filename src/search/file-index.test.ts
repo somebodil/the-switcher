@@ -177,7 +177,7 @@ suite("describe", () => {
         { text: "ta", highlighted: false },
       ],
       extension: null,
-      folder: { outer: "", inner: "Notes" },
+      folder: { outer: [], inner: [{ text: "Notes", highlighted: false }] },
       aliases: [],
     });
   });
@@ -189,7 +189,7 @@ suite("describe", () => {
         { text: "c", highlighted: true },
       ],
       extension: "png",
-      folder: { outer: "", inner: "img" },
+      folder: { outer: [], inner: [{ text: "img", highlighted: false }] },
       aliases: [],
     });
   });
@@ -200,7 +200,7 @@ suite("describe", () => {
       {
         name: [{ text: "with-alias", highlighted: false }],
         extension: null,
-        folder: { outer: "", inner: "Notes" },
+        folder: { outer: [], inner: [{ text: "Notes", highlighted: false }] },
         aliases: [
           [
             { text: "Z", highlighted: false },
@@ -219,14 +219,83 @@ suite("describe", () => {
       { text: "pl", highlighted: true },
       { text: "an", highlighted: false },
     ]);
-    assert.deepEqual(shown.folder, { outer: "Projects", inner: "/Deep" });
+    assert.deepEqual(shown.folder, {
+      outer: [{ text: "Projects", highlighted: false }],
+      inner: [
+        { text: "/", highlighted: false },
+        { text: "Deep", highlighted: true },
+      ],
+    });
     assert.deepEqual(view("x", file("A/B C/D/E/x.md")).folder, {
-      outer: "A/B C/D",
-      inner: "/E",
+      outer: [{ text: "A/B C/D", highlighted: false }],
+      inner: [{ text: "/E", highlighted: false }],
+    });
+  });
+
+  it("highlights what a word finds in the path of the folder", () => {
+    assert.deepEqual(view("soft", file("61_Software/Notes/a.md")).folder, {
+      outer: [
+        { text: "61_", highlighted: false },
+        { text: "Soft", highlighted: true },
+        { text: "ware", highlighted: false },
+      ],
+      inner: [{ text: "/Notes", highlighted: false }],
+    });
+  });
+
+  it("highlights a word in the name and in the folder if both have it", () => {
+    const shown = view("no", file("Notes/note.md"));
+    assert.deepEqual(shown.name, [
+      { text: "no", highlighted: true },
+      { text: "te", highlighted: false },
+    ]);
+    assert.deepEqual(shown.folder.inner, [
+      { text: "No", highlighted: true },
+      { text: "tes", highlighted: false },
+    ]);
+  });
+
+  it("cuts a match that reaches from the outer folders into the innermost one", () => {
+    assert.deepEqual(view("ware/no", file("Software/Notes/a.md")).folder, {
+      outer: [
+        { text: "Soft", highlighted: false },
+        { text: "ware", highlighted: true },
+      ],
+      inner: [
+        { text: "/No", highlighted: true },
+        { text: "tes", highlighted: false },
+      ],
+    });
+  });
+
+  it("highlights the whole word where the path has it, and not its folders apart from that", () => {
+    assert.deepEqual(view("a/b", file("Data/a/b/x.md")).folder, {
+      outer: [
+        { text: "Data/", highlighted: false },
+        { text: "a", highlighted: true },
+      ],
+      inner: [{ text: "/b", highlighted: true }],
+    });
+  });
+
+  it("finds a word in a folder with spaces in its name", () => {
+    assert.deepEqual(view("bc", file("A/B C/x.md")).folder.inner, [
+      { text: "/", highlighted: false },
+      { text: "B C", highlighted: true },
+    ]);
+  });
+
+  it("does not highlight what a word with a minus finds, or the name part of a word with a slash", () => {
+    assert.deepEqual(view("x -notes/zzz", file("Notes/x.md")).folder.inner, [
+      { text: "Notes", highlighted: false },
+    ]);
+    assert.deepEqual(view("Plans/no", file("Plans/Dno/now.md")).folder, {
+      outer: [{ text: "Plans", highlighted: true }],
+      inner: [{ text: "/Dno", highlighted: false }],
     });
   });
 
   it("has no folder for a file in the root of the vault", () => {
-    assert.deepEqual(view("root", file("root-note.md")).folder, { outer: "", inner: "" });
+    assert.deepEqual(view("root", file("root-note.md")).folder, { outer: [], inner: [] });
   });
 });

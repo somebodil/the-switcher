@@ -1,5 +1,11 @@
 import { fold, startsWith, stripEmoji } from "./fold.ts";
-import { locate, type Range, type Segment, toSegments } from "./highlight.ts";
+import {
+  locate,
+  type Range,
+  type Segment,
+  splitSegments,
+  toSegments,
+} from "./highlight.ts";
 import type { Term } from "./query.ts";
 
 /** What the search needs to know about a file. */
@@ -59,10 +65,13 @@ export interface HitView {
  * are the ones that tell where a file is.
  */
 export interface FolderView {
-  /** The folders around the innermost one. Empty if there are none. */
-  outer: string;
-  /** The innermost folder, after a "/" if it is in another. Empty in the root of the vault. */
-  inner: string;
+  /** The folders around the innermost one, cut where the terms match. Empty if there are none. */
+  outer: Segment[];
+  /**
+   * The innermost folder, after a "/" if it is in another, cut where the terms
+   * match. Empty in the root of the vault.
+   */
+  inner: Segment[];
 }
 
 const NOT_RECENT = Number.MAX_SAFE_INTEGER;
@@ -234,16 +243,27 @@ export class FileIndex {
   }
 }
 
-function toFolderView(folder: string): FolderView {
+/**
+ * Works out how to show the folder of a file. What a term finds in the path of
+ * the folder is the whole term or the folders of the term, as in `matches`.
+ */
+function toFolderView(folder: string, terms: Term[]): FolderView {
   // The root of the vault is "/", and a file in it has no folder to show
   const path = folder === "/" ? "" : folder;
-  const slash = path.lastIndexOf("/");
-  return slash === -1
-    ? { outer: "", inner: path }
-    : { outer: path.slice(0, slash), inner: path.slice(slash) };
+  const ranges = terms
+    .filter((term) => !term.negated)
+    .flatMap((term) => {
+      const whole = locate(path, term.text);
+      return whole
+        ? [whole]
+        : term.folders.flatMap((part) => locate(path, part) ?? []);
+    });
+  const segments = toSegments(path, ranges);
+  const [outer, inner] = splitSegments(segments, Math.max(path.lastIndexOf("/"), 0));
+  return { outer, inner };
 }
 
-/** Works out how to show a hit: where the terms match its name and its aliases. */
+/** Works out how to show a hit: where the terms match its name, its aliases and its folder. */
 export function describe(hit: Hit, terms: Term[]): HitView {
   const { file } = hit.entry;
   const words = terms
@@ -257,7 +277,7 @@ export function describe(hit: Hit, terms: Term[]): HitView {
     // what falls on the extension, which is shown apart from the name.
     name: toSegments(file.basename, rangesIn(searchableName(file))),
     extension: file.extension === "md" ? null : file.extension,
-    folder: toFolderView(file.folder),
+    folder: toFolderView(file.folder, terms),
     aliases: file.aliases
       .map((alias) => ({ alias, ranges: rangesIn(alias) }))
       .filter(({ ranges }) => ranges.length > 0)

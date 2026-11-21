@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { locate, mergeRanges, toSegments } from "./highlight.ts";
+import { locate, mergeRanges, splitSegments, toSegments } from "./highlight.ts";
 
 describe("locate", () => {
   it("finds a word regardless of case", () => {
@@ -87,5 +87,42 @@ describe("toSegments", () => {
     assert.deepEqual(toSegments("pic", [{ start: 4, end: 7 }]), [
       { text: "pic", highlighted: false },
     ]);
+  });
+});
+
+describe("splitSegments", () => {
+  const segments = [
+    { text: "ab", highlighted: false },
+    { text: "cd", highlighted: true },
+    { text: "ef", highlighted: false },
+  ];
+
+  it("cuts between two segments", () => {
+    assert.deepEqual(splitSegments(segments, 2), [
+      [{ text: "ab", highlighted: false }],
+      [
+        { text: "cd", highlighted: true },
+        { text: "ef", highlighted: false },
+      ],
+    ]);
+  });
+
+  it("cuts a segment that the offset falls in, and both parts stay as they were", () => {
+    assert.deepEqual(splitSegments(segments, 3), [
+      [
+        { text: "ab", highlighted: false },
+        { text: "c", highlighted: true },
+      ],
+      [
+        { text: "d", highlighted: true },
+        { text: "ef", highlighted: false },
+      ],
+    ]);
+  });
+
+  it("puts everything on one side when the offset is at an end", () => {
+    assert.deepEqual(splitSegments(segments, 0), [[], segments]);
+    assert.deepEqual(splitSegments(segments, 6), [segments, []]);
+    assert.deepEqual(splitSegments([], 0), [[], []]);
   });
 });

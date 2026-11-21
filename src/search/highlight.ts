@@ -82,3 +82,30 @@ export function toSegments(text: string, ranges: Range[]): Segment[] {
   }
   return segments;
 }
+
+/**
+ * Cuts segments in two where the text that they make up has the given offset.
+ * A segment that the offset falls in is cut as well.
+ */
+export function splitSegments(
+  segments: Segment[],
+  offset: number,
+): [Segment[], Segment[]] {
+  const before: Segment[] = [];
+  const after: Segment[] = [];
+  let start = 0;
+  for (const segment of segments) {
+    const end = start + segment.text.length;
+    if (end <= offset) {
+      before.push(segment);
+    } else if (start >= offset) {
+      after.push(segment);
+    } else {
+      const cut = offset - start;
+      before.push({ ...segment, text: segment.text.slice(0, cut) });
+      after.push({ ...segment, text: segment.text.slice(cut) });
+    }
+    start = end;
+  }
+  return [before, after];
+}

@@ -215,6 +215,12 @@
   color: var(--text-muted);
 }
 
+/* What the query finds in the folders is a match too, but not what stands out in a row */
+.the-switcher-path .the-switcher-hit {
+  color: var(--text-accent);
+  color: color-mix(in srgb, var(--text-accent) 55%, var(--text-muted));
+}
+
 /*
  * A path that is too long is cut in its middle: the folders around the
  * innermost one give way, and end in an ellipsis. The innermost folder is cut

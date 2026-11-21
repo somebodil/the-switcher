@@ -60,7 +60,7 @@ Words are separated by spaces, and a file has to match all of them. Upper and lo
 | `Notes/alpha`  | Of those, the files with `alpha` in the name or in an alias              |
 
 - Files other than Markdown notes show their extension and are found by it. `png` lists the PNG images.
-- A result shows the full path of the file, with the name of the file standing out. A path that is too long for the row is cut in its middle, and the name always stays: `Projects/2026…/Notes/Alpha`.
+- A result shows the full path of the file, with the name of the file standing out. A path that is too long for the row is cut in its middle, and the name always stays: `Projects/2026…/Notes/Alpha`. What the query matches in the folders is marked too, in a softer colour than a match in the name.
 - When a word matches an alias, that alias is shown under the name.
 - A word is also looked up as a whole in the folder path. `Notes/alpha` therefore lists everything in a folder `Notes/Alpha` as well.
 
