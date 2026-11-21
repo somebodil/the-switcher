@@ -19,6 +19,38 @@
   max-width: none;
 }
 
+/*
+ * The parts of a dialog differ in their background, so that each is seen as a
+ * part: the query is typed on the background of a note, the results are a list
+ * like the lists of the sidebars, and the rows between them are a little
+ * darker than both. The preview has a little of the accent colour in it, so
+ * that it is neither the query nor the list. The edge is darker than that of other dialogs, for a note
+ * that is behind the dialog and has the colour of the query.
+ */
+.the-switcher.prompt {
+  --the-switcher-bar: color-mix(
+    in srgb,
+    var(--background-modifier-border) 45%,
+    var(--background-secondary)
+  );
+  --the-switcher-page: color-mix(in srgb, var(--interactive-accent) 5%, var(--background-primary));
+  --the-switcher-gutter: color-mix(
+    in srgb,
+    var(--interactive-accent) 5%,
+    var(--background-secondary)
+  );
+  border-color: var(--background-modifier-border-focus);
+}
+
+.the-switcher .prompt-results {
+  background-color: var(--background-secondary);
+}
+
+.the-switcher .prompt-instructions {
+  border-top: 1px solid var(--background-modifier-border);
+  background-color: var(--the-switcher-bar);
+}
+
 /* A dialog that the mouse made higher ends a margin above the lower side of the window at the latest */
 .the-switcher.prompt.is-tall {
   height: min(
@@ -102,7 +134,9 @@
   align-items: center;
   gap: var(--size-4-2);
   padding: var(--size-2-2) var(--size-4-4);
+  border-top: 1px solid var(--background-modifier-border);
   border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--the-switcher-bar);
   color: var(--text-muted);
 }
 
@@ -327,19 +361,16 @@
   flex: none;
 }
 
-/* The line between the results and the preview. The mouse drags it to give one of them more room. */
+/*
+ * The line between the results and the preview. The mouse drags it to give one
+ * of them more room. It looks like the upper edge of the row with the path.
+ */
 .the-switcher-divider {
   flex: 0 0 5px;
-  background-color: var(--background-modifier-border);
-  background-clip: content-box;
-  padding: 2px 0;
+  border-top: 1px solid var(--background-modifier-border);
+  background-color: var(--the-switcher-bar);
   cursor: row-resize;
   transition: background-color 100ms ease-in-out;
-}
-
-.the-switcher-divider:hover,
-.the-switcher-divider.is-dragged {
-  background-clip: border-box;
 }
 
 .the-switcher-preview {
@@ -352,6 +383,7 @@
 .the-switcher-preview-path {
   padding: var(--size-2-3) var(--size-4-3);
   border-bottom: 1px solid var(--background-modifier-border);
+  background-color: var(--the-switcher-bar);
   color: var(--text-muted);
   font-size: var(--font-ui-smaller);
   overflow: hidden;
@@ -363,7 +395,7 @@
   position: relative;
   flex: 1;
   overflow: auto;
-  padding: var(--size-2-3) 0;
+  background-color: var(--the-switcher-page);
   font-size: var(--font-ui-small);
   line-height: var(--line-height-normal);
 }
@@ -379,11 +411,18 @@
 
 .the-switcher-preview-number {
   flex: 0 0 3.5em;
+  margin-inline-end: var(--size-4-2);
   padding-inline-end: var(--size-4-2);
+  border-inline-end: 1px solid var(--background-modifier-border);
+  background-color: var(--the-switcher-gutter);
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   text-align: end;
   user-select: none;
+}
+
+.the-switcher-preview-line.is-match .the-switcher-preview-number {
+  color: var(--text-muted);
 }
 
 .the-switcher-preview-text {
