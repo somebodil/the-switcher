@@ -37,7 +37,12 @@ export function makeDraggable<T>(el: HTMLElement, actions: DragActions<T>): void
     const move = (evt: PointerEvent): void => {
       actions.move(from, evt.clientX - down.clientX, evt.clientY - down.clientY, evt);
     };
-    const stop = (): void => {
+    const stop = (evt: PointerEvent): void => {
+      // Where the pointer is let go is where the drag ends, and no move may
+      // have told of that place. A drag that the app takes away has no such place.
+      if (evt.type === "pointerup") {
+        move(evt);
+      }
       el.removeEventListener("pointermove", move);
       el.removeEventListener("pointerup", stop);
       el.removeEventListener("pointercancel", stop);

@@ -9,6 +9,18 @@ import {
   type Target,
 } from "./switcher-modal.ts";
 
+/**
+ * Roughly how many letters of the Latin alphabet a text is as wide as. Letters
+ * such as those of Korean are twice as wide.
+ */
+function widthInLetters(text: string): number {
+  let width = 0;
+  for (const letter of text) {
+    width += (letter.codePointAt(0) ?? 0) >= 0x1100 ? 2 : 1;
+  }
+  return width;
+}
+
 /** A dialog that finds a file by its name and opens it. */
 export class FileModal extends SwitcherModal<Hit> {
   private readonly index: FileIndex;
@@ -50,10 +62,12 @@ export class FileModal extends SwitcherModal<Hit> {
       const pathEl = titleEl.createSpan({ cls: "the-switcher-path" });
       const foldersEl = pathEl.createSpan({ cls: "the-switcher-path-folders" });
       if (outer.length > 0) {
-        appendSegments(
-          foldersEl.createSpan({ cls: "the-switcher-path-outer" }),
-          outer,
-        );
+        const outerEl = foldersEl.createSpan({ cls: "the-switcher-path-outer" });
+        appendSegments(outerEl, outer);
+        // What is wider than its first letters and an ellipsis keeps the room
+        // of those when it is cut, so that a row shows that there are folders
+        // it has no room for
+        outerEl.toggleClass("mod-long", widthInLetters(outerEl.getText()) >= 5);
       }
       appendSegments(
         foldersEl.createSpan({ cls: "the-switcher-path-inner" }),

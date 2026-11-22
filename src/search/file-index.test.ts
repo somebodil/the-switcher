@@ -84,6 +84,13 @@ suite("FileIndex.search: order", () => {
     );
   });
 
+  it("does not sort by the space between an emoji and the name", () => {
+    assert.deepEqual(
+      find("", [file("n/📝 Memo.md"), file("n/2025 note.md"), file("n/Zebra.md")]),
+      ["n/2025 note.md", "n/📝 Memo.md", "n/Zebra.md"],
+    );
+  });
+
   it("breaks ties by Markdown, then recently opened, then recently modified", () => {
     const files = [
       file("a/note.png", { mtime: 9 }),

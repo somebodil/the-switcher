@@ -109,7 +109,10 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
       type: "text",
       value: options.excludeInput,
       attr: {
-        placeholder: "Exclude paths by regex, separated by commas",
+        // The row of a phone has no room for the whole sentence
+        placeholder: Platform.isPhone
+          ? "Exclude paths: regex, regex"
+          : "Exclude paths by regex, separated by commas",
         spellcheck: "false",
         autocapitalize: "off",
       },

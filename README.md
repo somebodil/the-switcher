@@ -147,6 +147,7 @@ In the mobile app the two commands are in the command palette, and you can put t
 - **On a phone, Find in files has no preview.** There is no room for it, and no key that moves the selection, so there are the results only: the line, the note, and the number of the line.
 - **On a phone, the exclude input is above the query,** next to the keyboard, in versions of Obsidian that have the query under the results.
 - **On a tablet, Find in files has its preview.** You drag the line between the results and the preview with a finger. With a keyboard the keys work as on a computer.
+- **On a tablet, a dialog ends above the keyboard of the screen.** When the keyboard leaves it too little room where it is, it goes up to the upper side of the screen.
 
 ## Development
 

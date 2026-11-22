@@ -9,15 +9,15 @@
 .the-switcher.prompt {
   --the-switcher-default-width: min(var(--prompt-width), var(--prompt-max-width));
   --the-switcher-window-margin: 16px;
-}
-
-body:not(.is-mobile) .the-switcher.prompt {
   /*
    * As far from the top as from the bottom when a dialog is as high as it gets
    * by itself. Obsidian 1.15 puts a dialog there, and Obsidian 1.12 puts it 80px
    * from the top. The heights below count on this place, so it is said here.
    */
   --the-switcher-top: calc((100vh - var(--prompt-max-height)) / 2);
+}
+
+body:not(.is-mobile) .the-switcher.prompt {
   top: var(--the-switcher-top);
   width: min(
     var(--the-switcher-width, var(--the-switcher-default-width)),
@@ -314,6 +314,25 @@ body:not(.is-mobile) .the-switcher.prompt {
   max-width: 100%;
 }
 
+/*
+ * The folders that give way keep the room of their first letters and the
+ * ellipsis, or a path that has lost all of them would look like one that starts
+ * at the innermost folder. Folders that are not wider than that have no such
+ * least width, which would leave a gap after them.
+ */
+.the-switcher-path-outer.mod-long {
+  min-width: 2em;
+}
+
+.the-switcher-path-outer.mod-long + .the-switcher-path-inner {
+  max-width: calc(100% - 2em);
+}
+
+/* Such a path needs more room to be worth a place next to the name */
+.the-switcher-path:has(.the-switcher-path-outer.mod-long) {
+  flex-basis: 5em;
+}
+
 .the-switcher-alias {
   display: inline-flex;
   align-items: center;
@@ -334,14 +353,37 @@ body:not(.is-mobile) .the-switcher-text.prompt {
   max-height: calc(100vh - var(--the-switcher-top) - var(--the-switcher-window-margin));
 }
 
-/* On a tablet it is as wide as on a computer, and ends above the lower side of the screen */
+/*
+ * A tablet puts a dialog where a computer does, and its keyboard comes up over
+ * the lower part of the screen: the app tells how high it is with the lower
+ * safe area. A dialog ends above that. When that leaves less than a dialog
+ * needs to show its results, the dialog goes up as far as it has to, and no
+ * further than the upper side of the screen.
+ */
+.is-tablet .the-switcher.prompt {
+  --the-switcher-least-height: 420px;
+  --the-switcher-bottom: calc(
+    var(--safe-area-inset-bottom, 0px) + var(--the-switcher-window-margin)
+  );
+  --the-switcher-tablet-top: max(
+    calc(var(--safe-area-inset-top, 0px) + var(--the-switcher-window-margin)),
+    min(
+      var(--the-switcher-top),
+      calc(100vh - var(--the-switcher-bottom) - var(--the-switcher-least-height))
+    )
+  );
+  top: var(--the-switcher-tablet-top);
+  max-height: min(
+    var(--prompt-max-height),
+    calc(100vh - var(--the-switcher-tablet-top) - var(--the-switcher-bottom))
+  );
+}
+
+/* Finding text is as wide on a tablet as on a computer, and as high as the screen lets it be */
 .is-tablet .the-switcher-text.prompt {
   width: var(--the-switcher-default-width);
   max-width: none;
-  max-height: calc(
-    100vh - var(--prompt-top) - var(--safe-area-inset-bottom) -
-      var(--the-switcher-window-margin)
-  );
+  max-height: calc(100vh - var(--the-switcher-tablet-top) - var(--the-switcher-bottom));
 }
 
 /* In a low window the dialog ends where it has to, and this is what gives way */

@@ -78,8 +78,9 @@ const NOT_RECENT = Number.MAX_SAFE_INTEGER;
 
 const collator = new Intl.Collator();
 
+/** What a name is sorted by: the name without emoji and without the space they leave at its ends. */
 function toSortText(label: string): string {
-  return stripEmoji(label).toLowerCase();
+  return stripEmoji(label).trim().toLowerCase();
 }
 
 function searchableName(file: FileInfo): string {
