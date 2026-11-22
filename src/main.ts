@@ -64,19 +64,8 @@ export default class TheSwitcherPlugin extends Plugin {
     this.data = { fileExclude: read("fileExclude"), textExclude: read("textExclude") };
   }
 
-  /**
-   * Where the link in the lower left corner of a dialog goes: the `fundingUrl`
-   * of manifest.json, so the address is written in one place. Without it the
-   * dialogs show no link.
-   */
-  private supportUrl(): string {
-    const url = (this.manifest as { fundingUrl?: unknown }).fundingUrl;
-    return typeof url === "string" ? url : "";
-  }
-
   private excludeOptions(key: keyof PluginData) {
     return {
-      supportUrl: this.supportUrl(),
       excludeInput: this.data[key],
       saveExcludeInput: async (value: string) => {
         this.data[key] = value;

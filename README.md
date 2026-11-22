@@ -139,14 +139,6 @@ You change the size of a dialog with the mouse.
 
 Each dialog remembers its own size. The sizes are kept on the device and not in `data.json`, so a sync does not carry them to a screen they do not fit.
 
-## Supporting the plugin
-
-At the lower left of each dialog is a link that says "Buy me a coffee". A click on it opens the page that `fundingUrl` in `manifest.json` names, in your browser.
-
-- Nothing is loaded from the network to show the link. It is a line of text that comes with the plugin.
-- The plugin uses the network for nothing else.
-- The keyboard never reaches the link, so it is not in the way of the keys.
-
 ## Development
 
 You need [Node.js](https://nodejs.org) 24 or later.

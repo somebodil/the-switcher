@@ -54,29 +54,6 @@
   background-color: var(--the-switcher-bar);
 }
 
-/*
- * The link to support the plugin is on the left of the bar, as far from the
- * keys as the bar is wide. It is as quiet as the bar until the mouse is on it.
- */
-.the-switcher .the-switcher-support {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--size-2-2);
-  margin-inline-end: auto;
-  color: var(--text-faint);
-  font-size: var(--font-ui-smaller);
-  text-decoration: none;
-}
-
-.the-switcher .the-switcher-support:hover {
-  color: var(--text-accent);
-}
-
-.the-switcher .the-switcher-support .the-switcher-icon {
-  --icon-size: var(--icon-xs);
-  display: inline-flex;
-}
-
 /* A dialog that the mouse made higher ends a margin above the lower side of the window at the latest */
 .the-switcher.prompt.is-tall {
   height: min(
