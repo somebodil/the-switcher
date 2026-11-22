@@ -36,15 +36,19 @@ export interface SwitcherOptions {
   saveExcludeInput: (value: string) => Promise<void>;
   /** Name under which the size of the dialog is kept on this device */
   layoutKey: string;
+  /** Where the link to support the plugin goes. Empty for no link. */
+  supportUrl: string;
 }
 
 /** What a dialog is told by the plugin. The rest is up to the dialog. */
 export type DialogOptions = Pick<
   SwitcherOptions,
-  "excludeInput" | "saveExcludeInput"
+  "excludeInput" | "saveExcludeInput" | "supportUrl"
 >;
 
 export const MAX_RESULTS = 50;
+/** What the link to support the plugin says */
+const SUPPORT_LABEL = "Buy me a coffee";
 /** How long after the last keystroke the exclude input is saved */
 const SAVE_DELAY_MS = 1000;
 /** How much of the window stays free around a dialog that is as large as it gets */
@@ -120,6 +124,7 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
     this.resultContainerEl.before(this.statusEl);
 
     this.bindKeys();
+    this.addSupportLink(options.supportUrl);
 
     this.layoutKey = options.layoutKey;
     this.layout = readLayout(app.loadLocalStorage(this.layoutKey));
@@ -318,6 +323,28 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
     this.saveExcludeInput(value).catch((error: unknown) => {
       console.error("The Switcher: failed to save the exclude input", error);
     });
+  }
+
+  /**
+   * Puts a link to support the plugin on the left of the bar with the keys.
+   * It is the only thing in a dialog that leaves the app, and only when it is
+   * clicked. The keyboard never reaches it.
+   */
+  private addSupportLink(url: string): void {
+    const barEl = this.modalEl.querySelector(".prompt-instructions");
+    if (url === "" || barEl === null) {
+      return;
+    }
+    const linkEl = createEl("a", {
+      cls: "the-switcher-support",
+      href: url,
+      attr: { tabindex: "-1", target: "_blank", rel: "noopener" },
+    });
+    setIcon(linkEl.createSpan({ cls: "the-switcher-icon" }), "coffee");
+    linkEl.createSpan({ text: SUPPORT_LABEL });
+    // A click must not take the cursor out of the query
+    linkEl.addEventListener("mousedown", (evt) => evt.preventDefault());
+    barEl.prepend(linkEl);
   }
 
   private bindKeys(): void {

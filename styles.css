@@ -46,9 +46,35 @@
   background-color: var(--background-secondary);
 }
 
+/* The keys are on the right, under the end of the rows, and not in the middle */
 .the-switcher .prompt-instructions {
+  justify-content: flex-end;
+  padding-inline: var(--size-4-4);
   border-top: 1px solid var(--background-modifier-border);
   background-color: var(--the-switcher-bar);
+}
+
+/*
+ * The link to support the plugin is on the left of the bar, as far from the
+ * keys as the bar is wide. It is as quiet as the bar until the mouse is on it.
+ */
+.the-switcher .the-switcher-support {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--size-2-2);
+  margin-inline-end: auto;
+  color: var(--text-faint);
+  font-size: var(--font-ui-smaller);
+  text-decoration: none;
+}
+
+.the-switcher .the-switcher-support:hover {
+  color: var(--text-accent);
+}
+
+.the-switcher .the-switcher-support .the-switcher-icon {
+  --icon-size: var(--icon-xs);
+  display: inline-flex;
 }
 
 /* A dialog that the mouse made higher ends a margin above the lower side of the window at the latest */
@@ -183,8 +209,18 @@
   font-size: var(--font-ui-small);
 }
 
+/*
+ * What the query matches has a yellow background. It is the colour that Obsidian
+ * gave to highlighted text until Obsidian 1.12, and a theme that sets that
+ * colour sets this one too.
+ */
+.the-switcher.prompt {
+  --the-switcher-hit: var(--text-highlight-bg, rgba(255, 208, 0, 0.4));
+}
+
 .the-switcher-hit {
-  color: var(--text-accent);
+  border-radius: 2px;
+  background-color: var(--the-switcher-hit);
 }
 
 .the-switcher .suggestion-aux {
@@ -251,8 +287,7 @@
 
 /* What the query finds in the folders is a match too, but not what stands out in a row */
 .the-switcher-path .the-switcher-hit {
-  color: var(--text-accent);
-  color: color-mix(in srgb, var(--text-accent) 55%, var(--text-muted));
+  background-color: color-mix(in srgb, var(--the-switcher-hit) 50%, transparent);
 }
 
 /*
