@@ -1,6 +1,6 @@
 {
   "name": "the-switcher",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "Obsidian plugin with two keyboard-driven dialogs: Go to file and Find in files",
   "private": true,
   "type": "module",
