@@ -1,4 +1,4 @@
-import type { App } from "obsidian";
+import { type App, Platform } from "obsidian";
 import type { NoteTexts } from "../note-texts.ts";
 import { FileIndex } from "../search/file-index.ts";
 import { toSegments } from "../search/highlight.ts";
@@ -129,7 +129,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
   }
 
   override onOpen(): void {
-    void super.onOpen();
+    super.onOpen();
     void this.readNotes();
   }
 
@@ -269,6 +269,10 @@ export class TextModal extends SwitcherModal<LineMatch> {
   }
 
   private updatePreview(): void {
+    if (Platform.isPhone) {
+      // A phone has no room for the preview, and no key that moves the selection
+      return;
+    }
     const selectedEl = this.resultContainerEl.querySelector(
       ".suggestion-item.is-selected",
     );

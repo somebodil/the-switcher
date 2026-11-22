@@ -124,7 +124,10 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
     this.layoutKey = options.layoutKey;
     this.layout = readLayout(app.loadLocalStorage(this.layoutKey));
     this.applyLayout();
-    this.addResizeHandles();
+    // A dialog of the mobile app is as large as the app makes it
+    if (!Platform.isMobile) {
+      this.addResizeHandles();
+    }
   }
 
   /** Called when the valid patterns of the exclude input change. */
@@ -132,6 +135,17 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
 
   /** Opens a result in the place that was asked for. */
   protected abstract openResult(result: T, target: Target): Promise<void>;
+
+  override onOpen(): void {
+    void super.onOpen();
+    // On a phone, newer versions of Obsidian have the query under the results,
+    // next to the keyboard. The exclude input goes there with it.
+    const queryEl = this.inputEl.parentElement;
+    this.modalEl.toggleClass(
+      "mod-query-below",
+      queryEl !== null && getComputedStyle(queryEl).order !== "0",
+    );
+  }
 
   override onClose(): void {
     super.onClose();
@@ -165,7 +179,9 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
 
   /** Gives the dialog the size of the layout. The style sheet does the rest. */
   protected applyLayout(): void {
-    const { width, height, split } = this.layout;
+    const { split } = this.layout;
+    // The width and the height are those of a window of the desktop app
+    const { width, height } = Platform.isMobile ? ({} as Layout) : this.layout;
     this.setLayoutValue("--the-switcher-width", width, "px");
     this.setLayoutValue("--the-switcher-height", height, "px");
     this.setLayoutValue(

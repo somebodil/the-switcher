@@ -12,7 +12,7 @@ There are no settings. Everything the plugin does is on this page.
 ## Requirements
 
 - Obsidian 1.8.7 or later
-- The desktop app. The plugin does not run on mobile.
+- The desktop app or the mobile app. What differs in the mobile app is under [On a phone or a tablet](#on-a-phone-or-a-tablet).
 
 ## Installation
 
@@ -138,6 +138,15 @@ You change the size of a dialog with the mouse.
 - **Back to the start.** Double-click what you dragged, and it is as it was before you changed it.
 
 Each dialog remembers its own size. The sizes are kept on the device and not in `data.json`, so a sync does not carry them to a screen they do not fit.
+
+## On a phone or a tablet
+
+In the mobile app the two commands are in the command palette, and you can put them on the mobile toolbar. A tap on a result opens it in the current tab.
+
+- **A dialog is as large as the app makes it.** On a phone it is as wide as the screen and goes down to the keyboard. Its sides are not dragged.
+- **On a phone, Find in files has no preview.** There is no room for it, and no key that moves the selection, so there are the results only: the line, the note, and the number of the line.
+- **On a phone, the exclude input is above the query,** next to the keyboard, in versions of Obsidian that have the query under the results.
+- **On a tablet, Find in files has its preview.** You drag the line between the results and the preview with a finger. With a keyboard the keys work as on a computer.
 
 ## Development
 

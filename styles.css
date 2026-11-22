@@ -1,10 +1,17 @@
 /*
  * The size of a dialog. It is as wide as the style sheet says until the mouse
  * drags a side, and as high as its results until the mouse drags the lower side.
+ *
+ * This is for the desktop app. In the mobile app a dialog is where the app puts
+ * it and as large as the app makes it, which on a phone is the whole width and
+ * down to the keyboard.
  */
 .the-switcher.prompt {
   --the-switcher-default-width: min(var(--prompt-width), var(--prompt-max-width));
   --the-switcher-window-margin: 16px;
+}
+
+body:not(.is-mobile) .the-switcher.prompt {
   /*
    * As far from the top as from the bottom when a dialog is as high as it gets
    * by itself. Obsidian 1.15 puts a dialog there, and Obsidian 1.12 puts it 80px
@@ -80,6 +87,7 @@
   position: absolute;
   z-index: 2;
   transition: background-color 100ms ease-in-out;
+  touch-action: none;
 }
 
 .the-switcher-resize:hover,
@@ -141,6 +149,12 @@
   border-bottom: 1px solid var(--background-modifier-border);
   background-color: var(--the-switcher-bar);
   color: var(--text-muted);
+}
+
+/* On a phone that has the query under the results, this row is right above the query */
+.the-switcher.mod-query-below .the-switcher-status {
+  order: 2;
+  border-bottom: none;
 }
 
 .the-switcher-icon {
@@ -314,7 +328,20 @@
  */
 .the-switcher-text.prompt {
   --the-switcher-default-width: min(900px, 92vw);
+}
+
+body:not(.is-mobile) .the-switcher-text.prompt {
   max-height: calc(100vh - var(--the-switcher-top) - var(--the-switcher-window-margin));
+}
+
+/* On a tablet it is as wide as on a computer, and ends above the lower side of the screen */
+.is-tablet .the-switcher-text.prompt {
+  width: var(--the-switcher-default-width);
+  max-width: none;
+  max-height: calc(
+    100vh - var(--prompt-top) - var(--safe-area-inset-bottom) -
+      var(--the-switcher-window-margin)
+  );
 }
 
 /* In a low window the dialog ends where it has to, and this is what gives way */
@@ -323,6 +350,27 @@
   flex-direction: column;
   height: min(72vh, 760px);
   min-height: 0;
+}
+
+/* A dialog of a phone has a height of its own, and the results fill it */
+.is-phone .the-switcher-body,
+.is-phone .the-switcher > .prompt-results {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
+}
+
+/*
+ * A phone has no room for the preview, and no key that moves the selection:
+ * a tap on a result opens it. So there are the results only.
+ */
+.is-phone .the-switcher-divider,
+.is-phone .the-switcher-preview {
+  display: none;
+}
+
+.is-phone .the-switcher-body > .prompt-results {
+  flex: 1 1 0;
 }
 
 /*
@@ -383,6 +431,19 @@
   background-color: var(--the-switcher-bar);
   cursor: row-resize;
   transition: background-color 100ms ease-in-out;
+  touch-action: none;
+}
+
+/* A finger is wider than the line, so on a touch screen more than the line takes hold of it */
+.is-mobile .the-switcher-divider {
+  position: relative;
+  z-index: 1;
+}
+
+.is-mobile .the-switcher-divider::before {
+  position: absolute;
+  inset: -12px 0;
+  content: "";
 }
 
 .the-switcher-preview {
