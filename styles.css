@@ -243,9 +243,15 @@ body:not(.is-mobile) .the-switcher.prompt {
   justify-content: flex-end;
   min-width: 0;
   height: 1.5em;
-  height: 1lh;
   overflow: hidden;
   white-space: nowrap;
+}
+
+/* The height of a line as the font has it, where the app knows this unit. Older ones keep the 1.5em above. */
+@supports (height: 1lh) {
+  .the-switcher-file {
+    height: 1lh;
+  }
 }
 
 .the-switcher-name {
