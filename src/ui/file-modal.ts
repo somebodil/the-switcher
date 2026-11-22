@@ -64,10 +64,10 @@ export class FileModal extends SwitcherModal<Hit> {
       if (outer.length > 0) {
         const outerEl = foldersEl.createSpan({ cls: "the-switcher-path-outer" });
         appendSegments(outerEl, outer);
-        // What is wider than its first letters and an ellipsis keeps the room
+        // What is wider than its first letter and an ellipsis keeps the room
         // of those when it is cut, so that a row shows that there are folders
         // it has no room for
-        outerEl.toggleClass("mod-long", widthInLetters(outerEl.getText()) >= 5);
+        outerEl.toggleClass("mod-long", widthInLetters(outerEl.getText()) >= 4);
       }
       appendSegments(
         foldersEl.createSpan({ cls: "the-switcher-path-inner" }),

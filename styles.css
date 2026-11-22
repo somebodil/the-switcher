@@ -315,22 +315,17 @@ body:not(.is-mobile) .the-switcher.prompt {
 }
 
 /*
- * The folders that give way keep the room of their first letters and the
+ * The folders that give way keep the room of their first letter and the
  * ellipsis, or a path that has lost all of them would look like one that starts
  * at the innermost folder. Folders that are not wider than that have no such
  * least width, which would leave a gap after them.
  */
 .the-switcher-path-outer.mod-long {
-  min-width: 2em;
+  min-width: 1.5em;
 }
 
 .the-switcher-path-outer.mod-long + .the-switcher-path-inner {
-  max-width: calc(100% - 2em);
-}
-
-/* Such a path needs more room to be worth a place next to the name */
-.the-switcher-path:has(.the-switcher-path-outer.mod-long) {
-  flex-basis: 5em;
+  max-width: calc(100% - 1.5em);
 }
 
 .the-switcher-alias {
