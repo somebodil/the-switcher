@@ -141,7 +141,7 @@ Each dialog remembers its own size. The sizes are kept on the device and not in 
 
 ## On a phone or a tablet
 
-In the mobile app the two commands are in the command palette, and you can put them on the mobile toolbar. A tap on a result opens it in the current tab.
+In the mobile app the two commands are in the command palette and in the ribbon menu, each with its icon, and you can put them on the mobile toolbar. A tap on a result opens it in the current tab.
 
 - **A dialog is as large as the app makes it.** On a phone it is as wide as the screen and goes down to the keyboard. Its sides are not dragged.
 - **On a phone, Find in files has no preview.** There is no room for it, and no key that moves the selection, so there are the results only: the line, the note, and the number of the line.

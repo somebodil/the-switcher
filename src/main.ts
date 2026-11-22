@@ -1,4 +1,4 @@
-import { Plugin } from "obsidian";
+import { Platform, Plugin } from "obsidian";
 import { NoteTexts } from "./note-texts.ts";
 import { FileModal } from "./ui/file-modal.ts";
 import { TextModal } from "./ui/text-modal.ts";
@@ -11,6 +11,14 @@ interface PluginData {
   textExclude: string;
 }
 
+/**
+ * The icons of the two commands, by their names in the icon set of Obsidian.
+ * The quick switcher of Obsidian has the file with the magnifier, so the one
+ * for files is another.
+ */
+const FILE_ICON = "folder-search";
+const TEXT_ICON = "text-search";
+
 export default class TheSwitcherPlugin extends Plugin {
   private data: PluginData = { fileExclude: "", textExclude: "" };
   private readonly noteTexts = new NoteTexts();
@@ -18,24 +26,38 @@ export default class TheSwitcherPlugin extends Plugin {
   override async onload(): Promise<void> {
     await this.readData();
 
+    const goToFile = (): void => {
+      new FileModal(this.app, this.excludeOptions("fileExclude")).open();
+    };
+    const findInFiles = (): void => {
+      new TextModal(
+        this.app,
+        this.noteTexts,
+        this.excludeOptions("textExclude"),
+      ).open();
+    };
+
+    // The icon is what a command shows on the mobile toolbar. Without one the
+    // two would look the same there.
     this.addCommand({
       id: "go-to-file",
       name: "Go to file",
-      callback: () => {
-        new FileModal(this.app, this.excludeOptions("fileExclude")).open();
-      },
+      icon: FILE_ICON,
+      callback: goToFile,
     });
     this.addCommand({
       id: "find-in-files",
       name: "Find in files",
-      callback: () => {
-        new TextModal(
-          this.app,
-          this.noteTexts,
-          this.excludeOptions("textExclude"),
-        ).open();
-      },
+      icon: TEXT_ICON,
+      callback: findInFiles,
     });
+
+    // A phone or a tablet has no hotkey, so there the dialogs get a place to
+    // tap. On a computer the ribbon stays as it is.
+    if (Platform.isMobile) {
+      this.addRibbonIcon(FILE_ICON, "Go to file", goToFile);
+      this.addRibbonIcon(TEXT_ICON, "Find in files", findInFiles);
+    }
   }
 
   /**
