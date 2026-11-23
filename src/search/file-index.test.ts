@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe as suite, it } from "node:test";
-import { describe, FileIndex, type FileInfo } from "./file-index.ts";
+import { describe, FileIndex, type FileInfo, KeptIndex } from "./file-index.ts";
 import { parseQuery } from "./query.ts";
 
 function file(path: string, options: Partial<FileInfo> = {}): FileInfo {
@@ -304,5 +304,107 @@ suite("describe", () => {
 
   it("has no folder for a file in the root of the vault", () => {
     assert.deepEqual(view("root", file("root-note.md")).folder, { outer: [], inner: [] });
+  });
+});
+
+/** Numbers that are the same in every run, so that a test that fails can be looked at again. */
+function numbers(seed: number): () => number {
+  let x = seed;
+  return () => {
+    x = (x * 1103515245 + 12345) >>> 0;
+    return x / 2 ** 32;
+  };
+}
+
+/** A vault of files whose names share words, some with emoji, aliases, and folders in folders. */
+function manyFiles(count: number, random: () => number): FileInfo[] {
+  const words = ["note", "Plan", "meeting", "회의", "노트 정리", "📝 memo", "alpha", "Alpha Beta", "al", "plan b", "🇰🇷 여행", "x"];
+  const word = (): string => words[Math.floor(random() * words.length)];
+  return Array.from({ length: count }, (_, i) => {
+    const folder = random() < 0.1 ? "" : `${word()}/${word()} ${i % 5}`;
+    const extension = random() < 0.8 ? "md" : "png";
+    return file(`${folder === "" ? "" : `${folder}/`}${word()} ${word()} ${i % 40}.${extension}`, {
+      mtime: Math.floor(random() * 1000),
+      aliases: random() < 0.3 ? [`${word()} ${i % 9}`, word()] : [],
+    });
+  });
+}
+
+/** What a search gives, in a form that two searches can be compared by. */
+function listed(index: FileIndex, query: string): string[] {
+  return index.search(parseQuery(query)).map((hit) => `${hit.entry.file.path} ${hit.prefixCount} ${hit.sortText}`);
+}
+
+suite("FileIndex: what it keeps from one search and from one index to the next", () => {
+  it("finds the same while a query is typed, changed and taken back as an index that never searched before", () => {
+    const random = numbers(7);
+    const files = manyFiles(600, random);
+    const typed = [
+      "note plan 3", "회의 정리", "al", "alpha/ no", "plan/note", "plan -note", "-al -x me", "📝", "memo 1", "노트정리/", "x x", "\"plan b\" 2",
+    ];
+    const index = new FileIndex(files, [files[3].path, files[90].path]);
+    for (const query of typed) {
+      // Key by key, then back again key by key, and then the whole query after another one
+      const steps = [
+        ...Array.from({ length: query.length }, (_, i) => query.slice(0, i + 1)),
+        ...Array.from({ length: query.length }, (_, i) => query.slice(0, query.length - i - 1)),
+        "zz",
+        query,
+      ];
+      for (const step of steps) {
+        const fresh = new FileIndex(files, [files[3].path, files[90].path]);
+        assert.deepEqual(listed(index, step), listed(fresh, step), `after typing up to "${step}" of "${query}"`);
+      }
+    }
+  });
+
+  it("finds the same after the files that are excluded change", () => {
+    const files = manyFiles(300, numbers(11));
+    const index = new FileIndex(files);
+    listed(index, "no");
+    index.exclude([/plan/i]);
+    const fresh = new FileIndex(files);
+    fresh.exclude([/plan/i]);
+    assert.deepEqual(listed(index, "not"), listed(fresh, "not"));
+    index.exclude([]);
+    assert.deepEqual(listed(index, "note"), listed(new FileIndex(files), "note"));
+  });
+
+  it("is the same index with what was kept of the one before as without, whatever changed in between", () => {
+    const random = numbers(23);
+    let files = manyFiles(500, random);
+    const kept = new KeptIndex();
+    for (let round = 0; round < 12; round++) {
+      const recent = [files[Math.floor(random() * files.length)].path, files[Math.floor(random() * files.length)].path];
+      // The file that is open is not listed, and it is another one each time
+      const open = files[Math.floor(random() * files.length)].path;
+      const shown = files.filter((info) => info.path !== open);
+      const withKept = new FileIndex(shown, recent, kept);
+      const without = new FileIndex(shown, recent);
+      for (const query of ["", "al", "note 1", "회의/ 노트", "-plan me"]) {
+        assert.deepEqual(listed(withKept, query), listed(without, query), `round ${round}, "${query}"`);
+      }
+      // Between two times that a dialog opens: files go, come, get another name, time or alias
+      files = files
+        .filter(() => random() > 0.05)
+        .map((info) => {
+          const dice = random();
+          if (dice < 0.05) {
+            return file(info.path.replace(/(\d+)\./, (_, n: string) => `${Number(n) + 1}.`), { mtime: info.mtime, aliases: info.aliases });
+          }
+          if (dice < 0.1) {
+            return { ...info, aliases: info.aliases.length > 0 ? [] : ["Alpha again"] };
+          }
+          if (dice < 0.2) {
+            return { ...info, mtime: info.mtime + 5 };
+          }
+          // As Obsidian does it: what is told of a file is made anew each time
+          return { ...info, aliases: [...info.aliases] };
+        })
+        .concat(manyFiles(20, random).map((info) => ({ ...info, path: `new ${round}/${info.path}`, folder: `new ${round}/${info.folder}` })));
+      // Two files of one path cannot be: the later one counts
+      files = [...new Map(files.map((info) => [info.path, info])).values()];
+    }
+    assert.ok(kept.hits.size <= files.length + 256 + 60, "what is kept of files that are gone does not pile up");
   });
 });

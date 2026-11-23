@@ -36,6 +36,9 @@ const NOTES_PER_LOOK_AT_CLOCK = 8;
  */
 const LIST_AGAIN_MS = 100;
 
+/** The notes are put in order by their names only, so none of them is given aliases */
+const NO_ALIASES: string[] = [];
+
 /** A dialog that finds a text in the notes and opens a note at the line that has it. */
 export class TextModal extends SwitcherModal<LineMatch> {
   private readonly texts: NoteTexts;
@@ -85,9 +88,10 @@ export class TextModal extends SwitcherModal<LineMatch> {
         extension: note.extension,
         folder: note.parent?.path ?? "/",
         mtime: note.stat.mtime,
-        aliases: [],
+        aliases: NO_ALIASES,
       })),
       workspace.getLastOpenFiles(),
+      options.kept,
     );
     this.onExcludeChange();
 
@@ -149,7 +153,8 @@ export class TextModal extends SwitcherModal<LineMatch> {
     }
     // The search itself asks for its results to be listed again when it finds more
     if (this.search?.query !== query) {
-      this.search = this.texts.index.search(query, this.paths, MAX_RESULTS);
+      // A search that is dropped when the notes or the paths to look in change, so what it found still holds
+      this.search = this.texts.index.searchOn(this.search, query, this.paths, MAX_RESULTS);
       this.searchPart(this.search);
     }
     const { matches, total, done } = this.search;
@@ -208,7 +213,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
     try {
       await this.texts.refresh(this.app.vault);
     } catch (error: unknown) {
-      console.error("The Switcher: failed to read the notes", error);
+      console.error("the-switcher: failed to read the notes", error);
     }
     this.isReading = false;
     this.search = null;

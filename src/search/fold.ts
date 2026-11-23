@@ -1,4 +1,7 @@
 const WHITESPACE = /\s+/g;
+const HAS_WHITESPACE = /\s/;
+/** What an emoji is made of is never among these: the letters and signs of ASCII, and the syllables of Korean */
+const NO_EMOJI = /^[\u0020-\u007E\uAC00-\uD7A3]*$/;
 
 // An emoji can be several characters: pictographs, skin tones and flag letters,
 // glued together by joiners, keycap marks and variation selectors
@@ -10,7 +13,9 @@ const EMOJI =
  * is dropped, so that "alphabeta" finds "Alpha Beta".
  */
 export function fold(text: string): string {
-  return text.toLowerCase().replace(WHITESPACE, "");
+  const lower = text.toLowerCase();
+  // Most names of files and folders have no space, and need no second pass
+  return HAS_WHITESPACE.test(lower) ? lower.replace(WHITESPACE, "") : lower;
 }
 
 /**
@@ -18,7 +23,8 @@ export function fold(text: string): string {
  * list, and a name like "📝 Memo" should still count as starting with "memo".
  */
 export function stripEmoji(text: string): string {
-  return text.replace(EMOJI, "");
+  // The pattern of emoji is slow to run. Most texts are seen to have none at a glance.
+  return NO_EMOJI.test(text) ? text : text.replace(EMOJI, "");
 }
 
 /** True if the folded text starts with the folded word, emoji aside. */

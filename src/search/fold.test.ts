@@ -39,3 +39,21 @@ describe("startsWith", () => {
     assert.equal(startsWith("memo", "em"), false);
   });
 });
+
+describe("texts that are seen at a glance to need no work", () => {
+  it("still finds the emoji that hide among signs and Korean", () => {
+    // What a glance may take for plain: the signs of a keyboard, and the two signs that are emoji
+    assert.equal(stripEmoji("가계부 #1 (정산)"), "가계부 #1 (정산)");
+    assert.equal(stripEmoji("가계부 📝 정산"), "가계부  정산");
+    assert.equal(stripEmoji("made by me ©"), "made by me ");
+    assert.equal(stripEmoji("1️⃣ first"), "1 first");
+    assert.equal(stripEmoji("café ☕"), "café ");
+    assert.equal(stripEmoji(""), "");
+  });
+
+  it("folds a text with any kind of whitespace, and one with none", () => {
+    assert.equal(fold("NoSpace"), "nospace");
+    assert.equal(fold("a\u00A0b\u3000c\nd"), "abcd");
+    assert.equal(fold(""), "");
+  });
+});

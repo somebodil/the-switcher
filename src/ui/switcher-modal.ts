@@ -13,6 +13,7 @@ import {
   type WorkspaceLeaf,
 } from "obsidian";
 import { parseExcludeRules } from "../search/exclude.ts";
+import type { KeptIndex } from "../search/file-index.ts";
 import type { Range, Segment } from "../search/highlight.ts";
 import { makeDraggable } from "./drag.ts";
 import { dragHeight, dragWidth, type Layout, readLayout } from "./layout.ts";
@@ -36,12 +37,17 @@ export interface SwitcherOptions {
   saveExcludeInput: (value: string) => Promise<void>;
   /** Name under which the size of the dialog is kept on this device */
   layoutKey: string;
+  /**
+   * What the dialog worked out for the files the last time it was open. With
+   * it a dialog is ready sooner, and it brings it up to date for the next time.
+   */
+  kept: KeptIndex;
 }
 
 /** What a dialog is told by the plugin. The rest is up to the dialog. */
 export type DialogOptions = Pick<
   SwitcherOptions,
-  "excludeInput" | "saveExcludeInput"
+  "excludeInput" | "saveExcludeInput" | "kept"
 >;
 
 export const MAX_RESULTS = 50;
@@ -335,7 +341,7 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
     }
     this.savedExcludeInput = value;
     this.saveExcludeInput(value).catch((error: unknown) => {
-      console.error("The Switcher: failed to save the exclude input", error);
+      console.error("the-switcher: failed to save the exclude input", error);
     });
   }
 

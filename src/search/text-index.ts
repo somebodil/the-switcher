@@ -58,15 +58,24 @@ function lineOf(text: string, start: number, lineBreak: number): string {
   return text.slice(start, end);
 }
 
+/** The pattern of the query that was asked for last. A list of results asks for the same one line after line. */
+let lastPattern: { query: string; pattern: RegExp } | null = null;
+
 /** Finds every place where a line has the query, whatever its case. */
 export function findAll(line: string, query: string): Range[] {
   if (query === "") {
     return [];
   }
-  return Array.from(line.matchAll(toPattern(query)), (found) => ({
-    start: found.index,
-    end: found.index + found[0].length,
-  }));
+  if (lastPattern?.query !== query) {
+    lastPattern = { query, pattern: toPattern(query) };
+  }
+  const { pattern } = lastPattern;
+  pattern.lastIndex = 0;
+  const ranges: Range[] = [];
+  for (let found = pattern.exec(line); found !== null; found = pattern.exec(line)) {
+    ranges.push({ start: found.index, end: found.index + found[0].length });
+  }
+  return ranges;
 }
 
 /**
@@ -84,6 +93,11 @@ export class TextSearch {
   total = 0;
   /** True once every note was looked at */
   done: boolean;
+  /**
+   * The notes that have the query, in the order they were looked at. A search
+   * for a query that has this one in it needs to look at no other note.
+   */
+  readonly found: string[] = [];
 
   readonly query: string;
   private readonly texts: ReadonlyMap<string, string>;
@@ -142,6 +156,9 @@ export class TextSearch {
       if (!found) {
         return;
       }
+      if (this.found[this.found.length - 1] !== path) {
+        this.found.push(path);
+      }
       // Count the line breaks up to the match to know its line
       for (
         let lineBreak = text.indexOf("\n", lineStart);
@@ -172,6 +189,9 @@ export class TextSearch {
 
     // The list is full. A line that is only counted needs no number and no text.
     while (pattern.test(text)) {
+      if (this.found[this.found.length - 1] !== path) {
+        this.found.push(path);
+      }
       this.total++;
       const lineEnd = text.indexOf("\n", pattern.lastIndex);
       if (lineEnd === -1) {
@@ -210,6 +230,17 @@ export class TextIndex {
    */
   search(query: string, paths: readonly string[], limit: number): TextSearch {
     return new TextSearch(this.texts, query, paths, limit);
+  }
+
+  /**
+   * Starts a search as `search` does, for a query that was typed on from the
+   * query of a search that is done. Only the notes that had the query of
+   * before can have the longer one, so only those are looked at. If the search
+   * of before does not let this be done, all of the given notes are looked at.
+   */
+  searchOn(before: TextSearch | null, query: string, paths: readonly string[], limit: number): TextSearch {
+    const within = before !== null && before.done && before.query.trim() !== "" && query.includes(before.query);
+    return new TextSearch(this.texts, query, within ? before.found : paths, limit);
   }
 
   /** Returns the lines around a line of a note, or null if the note is unknown. */

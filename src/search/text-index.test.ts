@@ -426,3 +426,56 @@ describe("toSnippet", () => {
     });
   });
 });
+
+describe("TextIndex.searchOn", () => {
+  const many: Record<string, string> = {};
+  for (let i = 0; i < 60; i++) {
+    many[`n${String(i).padStart(2, "0")}.md`] = [
+      i % 3 === 0 ? "A quick Fox" : "nothing",
+      i % 4 === 0 ? "fox hunting season\nmore foxes" : "calm",
+      i % 5 === 0 ? "가계부 정산 fox" : "여행",
+    ].join("\n");
+  }
+  const index = indexOf(many);
+  const paths = Object.keys(many);
+
+  it("finds what a search of all notes finds, while a query is typed key by key", () => {
+    for (const query of ["fox hunt", "Fox", "가계부 정", "foxes", "zz", "a quick fox"]) {
+      let before: ReturnType<TextIndex["search"]> | null = null;
+      for (let i = 1; i <= query.length; i++) {
+        const typed = query.slice(0, i);
+        const on = index.searchOn(before, typed, paths, 7);
+        on.run();
+        const all = index.search(typed, paths, 7);
+        all.run();
+        assert.deepEqual([on.matches, on.total, on.found], [all.matches, all.total, all.found], `"${typed}"`);
+        before = on;
+      }
+    }
+  });
+
+  it("looks at all notes after a search that is not done, and after a query that this one does not have in it", () => {
+    const half = index.search("fox", paths, 7);
+    half.run(() => true);
+    assert.equal(half.done, false);
+    const afterHalf = index.searchOn(half, "foxes", paths, 7);
+    afterHalf.run();
+    const all = index.search("foxes", paths, 7);
+    all.run();
+    assert.deepEqual([afterHalf.matches, afterHalf.total], [all.matches, all.total]);
+
+    const quick = index.search("quick", paths, 7);
+    quick.run();
+    const other = index.searchOn(quick, "hunting", paths, 7);
+    other.run();
+    assert.equal(other.total, 15);
+    // Nothing was typed yet: every note is still to be looked at
+    const blank = index.search(" ", paths, 7);
+    const afterBlank = index.searchOn(blank, " fox", paths, 7);
+    afterBlank.run();
+    const allOfIt = index.search(" fox", paths, 7);
+    allOfIt.run();
+    assert.ok(allOfIt.total > 0);
+    assert.deepEqual([afterBlank.matches, afterBlank.total], [allOfIt.matches, allOfIt.total]);
+  });
+});

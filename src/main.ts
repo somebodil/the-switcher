@@ -1,5 +1,6 @@
 import { Platform, Plugin } from "obsidian";
 import { NoteTexts } from "./note-texts.ts";
+import { KeptIndex } from "./search/file-index.ts";
 import { FileModal } from "./ui/file-modal.ts";
 import { TextModal } from "./ui/text-modal.ts";
 
@@ -22,19 +23,18 @@ const TEXT_ICON = "text-search";
 export default class TheSwitcherPlugin extends Plugin {
   private data: PluginData = { fileExclude: "", textExclude: "" };
   private readonly noteTexts = new NoteTexts();
+  /** What each of the two dialogs worked out for the files the last time it was open, so that it is ready sooner the next time */
+  private readonly keptFiles = new KeptIndex();
+  private readonly keptNotes = new KeptIndex();
 
   override async onload(): Promise<void> {
     await this.readData();
 
     const goToFile = (): void => {
-      new FileModal(this.app, this.excludeOptions("fileExclude")).open();
+      new FileModal(this.app, { ...this.excludeOptions("fileExclude"), kept: this.keptFiles }).open();
     };
     const findInFiles = (): void => {
-      new TextModal(
-        this.app,
-        this.noteTexts,
-        this.excludeOptions("textExclude"),
-      ).open();
+      new TextModal(this.app, this.noteTexts, { ...this.excludeOptions("textExclude"), kept: this.keptNotes }).open();
     };
 
     // The icon is what a command shows on the mobile toolbar. Without one the

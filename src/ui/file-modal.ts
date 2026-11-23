@@ -1,5 +1,5 @@
 import { type App, parseFrontMatterAliases, setIcon } from "obsidian";
-import { describe, FileIndex, type Hit } from "../search/file-index.ts";
+import { describe, type FileInfo, FileIndex, type Hit, type KeptIndex } from "../search/file-index.ts";
 import { parseQuery, type Term } from "../search/query.ts";
 import {
   appendSegments,
@@ -21,6 +21,9 @@ function widthInLetters(text: string): number {
   return width;
 }
 
+/** The aliases of a file that has none */
+const NO_ALIASES: string[] = [];
+
 /** A dialog that finds a file by its name and opens it. */
 export class FileModal extends SwitcherModal<Hit> {
   private readonly index: FileIndex;
@@ -34,7 +37,7 @@ export class FileModal extends SwitcherModal<Hit> {
       layoutKey: "the-switcher-file-layout",
     });
     this.modalEl.addClass("the-switcher-files");
-    this.index = this.buildIndex();
+    this.index = this.buildIndex(options.kept);
     this.index.exclude(this.excludePatterns);
   }
 
@@ -98,25 +101,25 @@ export class FileModal extends SwitcherModal<Hit> {
   }
 
   /** Lists every file but the active one, since nobody switches to where they are. */
-  private buildIndex(): FileIndex {
+  private buildIndex(kept: KeptIndex): FileIndex {
     const { vault, workspace, metadataCache } = this.app;
     const activePath = workspace.getActiveFile()?.path;
-    return new FileIndex(
-      vault
-        .getFiles()
-        .filter((file) => file.path !== activePath)
-        .map((file) => ({
-          path: file.path,
-          basename: file.basename,
-          extension: file.extension,
-          folder: file.parent?.path ?? "/",
-          mtime: file.stat.mtime,
-          aliases:
-            parseFrontMatterAliases(
-              metadataCache.getFileCache(file)?.frontmatter,
-            ) ?? [],
-        })),
-      workspace.getLastOpenFiles(),
-    );
+    const files: FileInfo[] = [];
+    for (const file of vault.getFiles()) {
+      if (file.path === activePath) {
+        continue;
+      }
+      // Only a note has properties, and with them aliases. Most notes have none.
+      const frontmatter = file.extension === "md" ? metadataCache.getFileCache(file)?.frontmatter : undefined;
+      files.push({
+        path: file.path,
+        basename: file.basename,
+        extension: file.extension,
+        folder: file.parent?.path ?? "/",
+        mtime: file.stat.mtime,
+        aliases: (frontmatter === undefined ? null : parseFrontMatterAliases(frontmatter)) ?? NO_ALIASES,
+      });
+    }
+    return new FileIndex(files, workspace.getLastOpenFiles(), kept);
   }
 }
