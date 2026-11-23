@@ -1,4 +1,4 @@
-# The Switcher
+# the-switcher
 
 Two dialogs for [Obsidian](https://obsidian.md) that take you where you want to be, without leaving the keyboard.
 
@@ -16,10 +16,10 @@ There are no settings. Everything the plugin does is on this page.
 
 ## Installation
 
-The Switcher is in the community plugin directory of Obsidian.
+the-switcher is in the community plugin directory of Obsidian.
 
 1. In Obsidian, go to **Settings → Community plugins**. If community plugins are still turned off, turn them on.
-2. Select **Browse** and search for **The Switcher**.
+2. Select **Browse** and search for **the-switcher**.
 3. Select **Install**, and then **Enable**.
 
 Obsidian tells you when there is a newer version, and installs it for you.
@@ -29,7 +29,7 @@ Obsidian tells you when there is a newer version, and installs it for you.
 1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/somebodil/the-switcher/releases/latest).
 2. In your vault, create the folder `.obsidian/plugins/the-switcher/` and put the three files in it. `.obsidian` is a hidden folder.
 3. Restart Obsidian.
-4. Go to **Settings → Community plugins** and switch on **The Switcher** in the list of installed plugins.
+4. Go to **Settings → Community plugins** and switch on **the-switcher** in the list of installed plugins.
 
 To update, replace the three files with the ones from a newer release and restart Obsidian.
 
@@ -37,8 +37,8 @@ To update, replace the three files with the ones from a newer release and restar
 
 The plugin adds two commands:
 
-- **The Switcher: Go to file**
-- **The Switcher: Find in files**
+- **the-switcher: Go to file**
+- **the-switcher: Find in files**
 
 Neither has a hotkey until you give it one under **Settings → Hotkeys**. Until then, run them from the command palette.
 
@@ -175,7 +175,7 @@ gh attestation verify main.js --repo somebodil/the-switcher
 ## Acknowledgements
 
 - Inspired by Go to File and Find in Files in [IntelliJ IDEA](https://www.jetbrains.com/idea/).
-- Some ideas for the query of Go to file come from [Another Quick Switcher](https://github.com/tadashi-aikawa/obsidian-another-quick-switcher) by Tadashi Aikawa. The Switcher shares no code with it.
+- Some ideas for the query of Go to file come from [Another Quick Switcher](https://github.com/tadashi-aikawa/obsidian-another-quick-switcher) by Tadashi Aikawa. the-switcher shares no code with it.
 
 ## License
 
