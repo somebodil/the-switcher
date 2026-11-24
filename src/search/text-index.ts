@@ -225,18 +225,9 @@ export class TextIndex {
    * its case. A line is listed once, however often it has the query.
    * Nothing is found before the search is run.
    *
+   * @param before the search of before, or null. When the query was typed on from the query of a search that is done, only the notes that had the query of before can have the longer one, so only those are looked at. If the search of before does not let this be done, all of the given notes are looked at.
    * @param paths the notes to look in. Their order is the order of the result.
    * @param limit how many matching lines to list. All of them are counted.
-   */
-  search(query: string, paths: readonly string[], limit: number): TextSearch {
-    return new TextSearch(this.texts, query, paths, limit);
-  }
-
-  /**
-   * Starts a search as `search` does, for a query that was typed on from the
-   * query of a search that is done. Only the notes that had the query of
-   * before can have the longer one, so only those are looked at. If the search
-   * of before does not let this be done, all of the given notes are looked at.
    */
   searchOn(before: TextSearch | null, query: string, paths: readonly string[], limit: number): TextSearch {
     const within = before !== null && before.done && before.query.trim() !== "" && query.includes(before.query);

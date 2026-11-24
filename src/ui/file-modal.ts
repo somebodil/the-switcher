@@ -85,7 +85,7 @@ export class FileModal extends SwitcherModal<Hit> {
         const aliasEl = noteEl.createSpan({ cls: "the-switcher-alias" });
         setIcon(aliasEl.createSpan({ cls: "the-switcher-icon" }), "forward");
         appendSegments(
-          aliasEl.createSpan({ cls: "the-switcher-alias-text" }),
+          aliasEl.createSpan(),
           alias,
         );
       }

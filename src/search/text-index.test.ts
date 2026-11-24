@@ -22,7 +22,7 @@ function find(
   paths: string[],
   limit: number,
 ): { matches: LineMatch[]; total: number } {
-  const search = index.search(query, paths, limit);
+  const search = index.searchOn(null, query, paths, limit);
   search.run();
   assert.equal(search.done, true);
   return { matches: search.matches, total: search.total };
@@ -238,20 +238,20 @@ describe("TextSearch.run", () => {
   const paths = Object.keys(many);
 
   it("finds nothing before it is run", () => {
-    const search = index.search("fox", paths, 5);
+    const search = index.searchOn(null, "fox", paths, 5);
     assert.equal(search.done, false);
     assert.equal(search.total, 0);
     assert.deepEqual(search.matches, []);
   });
 
   it("is done at once when there is nothing to look for or nowhere to look", () => {
-    assert.equal(index.search("", paths, 5).done, true);
-    assert.equal(index.search(" ", paths, 5).done, true);
-    assert.equal(index.search("fox", [], 5).done, true);
+    assert.equal(index.searchOn(null, "", paths, 5).done, true);
+    assert.equal(index.searchOn(null, " ", paths, 5).done, true);
+    assert.equal(index.searchOn(null, "fox", [], 5).done, true);
   });
 
   it("pauses when it is told to, and goes on where it stopped", () => {
-    const search = index.search("fox", paths, 5);
+    const search = index.searchOn(null, "fox", paths, 5);
     search.run(() => true);
     assert.equal(search.done, false);
     assert.equal(search.total, 2);
@@ -275,7 +275,7 @@ describe("TextSearch.run", () => {
   it("finds the same in parts as in one go", () => {
     const whole = find(index, "fox", paths, 7);
     for (const every of [1, 2, 3, 7, 19, 20, 21]) {
-      const search = index.search("fox", paths, 7);
+      const search = index.searchOn(null, "fox", paths, 7);
       let runs = 0;
       while (!search.done) {
         let notes = 0;
@@ -291,20 +291,20 @@ describe("TextSearch.run", () => {
   });
 
   it("is done after the last note, also when it pauses there", () => {
-    const search = index.search("fox", ["n00.md"], 5);
+    const search = index.searchOn(null, "fox", ["n00.md"], 5);
     search.run(() => true);
     assert.equal(search.done, true);
   });
 
   it("does nothing more once it is done", () => {
-    const search = index.search("fox", paths, 5);
+    const search = index.searchOn(null, "fox", paths, 5);
     search.run();
     search.run();
     assert.equal(search.total, 40);
   });
 
   it("skips a path without a note", () => {
-    const search = index.search("fox", ["gone.md", "n00.md", "gone.md"], 5);
+    const search = index.searchOn(null, "fox", ["gone.md", "n00.md", "gone.md"], 5);
     search.run();
     assert.equal(search.done, true);
     assert.equal(search.total, 2);
@@ -441,12 +441,12 @@ describe("TextIndex.searchOn", () => {
 
   it("finds what a search of all notes finds, while a query is typed key by key", () => {
     for (const query of ["fox hunt", "Fox", "가계부 정", "foxes", "zz", "a quick fox"]) {
-      let before: ReturnType<TextIndex["search"]> | null = null;
+      let before: ReturnType<TextIndex["searchOn"]> | null = null;
       for (let i = 1; i <= query.length; i++) {
         const typed = query.slice(0, i);
         const on = index.searchOn(before, typed, paths, 7);
         on.run();
-        const all = index.search(typed, paths, 7);
+        const all = index.searchOn(null, typed, paths, 7);
         all.run();
         assert.deepEqual([on.matches, on.total, on.found], [all.matches, all.total, all.found], `"${typed}"`);
         before = on;
@@ -455,25 +455,25 @@ describe("TextIndex.searchOn", () => {
   });
 
   it("looks at all notes after a search that is not done, and after a query that this one does not have in it", () => {
-    const half = index.search("fox", paths, 7);
+    const half = index.searchOn(null, "fox", paths, 7);
     half.run(() => true);
     assert.equal(half.done, false);
     const afterHalf = index.searchOn(half, "foxes", paths, 7);
     afterHalf.run();
-    const all = index.search("foxes", paths, 7);
+    const all = index.searchOn(null, "foxes", paths, 7);
     all.run();
     assert.deepEqual([afterHalf.matches, afterHalf.total], [all.matches, all.total]);
 
-    const quick = index.search("quick", paths, 7);
+    const quick = index.searchOn(null, "quick", paths, 7);
     quick.run();
     const other = index.searchOn(quick, "hunting", paths, 7);
     other.run();
     assert.equal(other.total, 15);
     // Nothing was typed yet: every note is still to be looked at
-    const blank = index.search(" ", paths, 7);
+    const blank = index.searchOn(null, " ", paths, 7);
     const afterBlank = index.searchOn(blank, " fox", paths, 7);
     afterBlank.run();
-    const allOfIt = index.search(" fox", paths, 7);
+    const allOfIt = index.searchOn(null, " fox", paths, 7);
     allOfIt.run();
     assert.ok(allOfIt.total > 0);
     assert.deepEqual([afterBlank.matches, afterBlank.total], [allOfIt.matches, allOfIt.total]);

@@ -76,8 +76,6 @@ export class TextModal extends SwitcherModal<LineMatch> {
       layoutKey: "the-switcher-find-layout",
     });
     this.modalEl.addClass("the-switcher-text");
-    // The size of when the preview was beside the results does not fit under them
-    this.app.saveLocalStorage("the-switcher-text-layout", null);
     this.texts = texts;
 
     const { vault, workspace } = this.app;

@@ -26,8 +26,3 @@ export function stripEmoji(text: string): string {
   // The pattern of emoji is slow to run. Most texts are seen to have none at a glance.
   return NO_EMOJI.test(text) ? text : text.replace(EMOJI, "");
 }
-
-/** True if the folded text starts with the folded word, emoji aside. */
-export function startsWith(text: string, word: string): boolean {
-  return text.startsWith(word) || stripEmoji(text).startsWith(word);
-}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { fold, startsWith, stripEmoji } from "./fold.ts";
+import { fold, stripEmoji } from "./fold.ts";
 
 describe("fold", () => {
   it("lowercases and drops whitespace", () => {
@@ -29,14 +29,6 @@ describe("stripEmoji", () => {
 
   it("leaves letters, digits and punctuation alone", () => {
     assert.equal(stripEmoji("Plan #1 (v2) – 정산"), "Plan #1 (v2) – 정산");
-  });
-});
-
-describe("startsWith", () => {
-  it("looks past emoji at the start", () => {
-    assert.equal(startsWith("📝memo", "me"), true);
-    assert.equal(startsWith("📝memo", "📝me"), true);
-    assert.equal(startsWith("memo", "em"), false);
   });
 });
 
