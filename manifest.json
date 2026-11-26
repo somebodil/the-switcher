@@ -3,7 +3,7 @@
   "name": "the-switcher",
   "version": "1.0.8",
   "minAppVersion": "1.8.7",
-  "description": "Go to a file by its name or find text in your notes, and hide paths you never want to see with regular expressions.",
+  "description": "Go to a file by its name, find and replace text in your notes, and hide paths you never want to see with regular expressions.",
   "author": "somebodil",
   "authorUrl": "https://github.com/somebodil",
   "isDesktopOnly": false

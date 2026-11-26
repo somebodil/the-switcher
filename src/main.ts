@@ -8,17 +8,18 @@ import { TextModal } from "./ui/text-modal.ts";
 interface PluginData {
   /** Exclude input of the dialog that finds files */
   fileExclude: string;
-  /** Exclude input of the dialog that finds text */
+  /** Exclude input of the dialog that finds and replaces text */
   textExclude: string;
 }
 
 /**
- * The icons of the two commands, by their names in the icon set of Obsidian.
+ * The icons of the commands, by their names in the icon set of Obsidian.
  * The quick switcher of Obsidian has the file with the magnifier, so the one
  * for files is another.
  */
 const FILE_ICON = "folder-search";
 const TEXT_ICON = "text-search";
+const REPLACE_ICON = "replace";
 
 export default class TheSwitcherPlugin extends Plugin {
   private data: PluginData = { fileExclude: "", textExclude: "" };
@@ -33,12 +34,19 @@ export default class TheSwitcherPlugin extends Plugin {
     const goToFile = (): void => {
       new FileModal(this.app, { ...this.excludeOptions("fileExclude"), kept: this.keptFiles }).open();
     };
-    const findInFiles = (): void => {
-      new TextModal(this.app, this.noteTexts, { ...this.excludeOptions("textExclude"), kept: this.keptNotes }).open();
+    // Finding and replacing is one dialog. It opens with or without the row for the replacement.
+    const textDialog = (replacing: boolean) => (): void => {
+      new TextModal(this.app, this.noteTexts, {
+        ...this.excludeOptions("textExclude"),
+        kept: this.keptNotes,
+        replacing,
+      }).open();
     };
+    const findInFiles = textDialog(false);
+    const replaceInFiles = textDialog(true);
 
     // The icon is what a command shows on the mobile toolbar. Without one the
-    // two would look the same there.
+    // commands would look the same there.
     this.addCommand({
       id: "go-to-file",
       name: "Go to file",
@@ -51,12 +59,19 @@ export default class TheSwitcherPlugin extends Plugin {
       icon: TEXT_ICON,
       callback: findInFiles,
     });
+    this.addCommand({
+      id: "replace-in-files",
+      name: "Replace in files",
+      icon: REPLACE_ICON,
+      callback: replaceInFiles,
+    });
 
     // A phone or a tablet has no hotkey, so there the dialogs get a place to
     // tap. On a computer the ribbon stays as it is.
     if (Platform.isMobile) {
       this.addRibbonIcon(FILE_ICON, "Go to file", goToFile);
       this.addRibbonIcon(TEXT_ICON, "Find in files", findInFiles);
+      this.addRibbonIcon(REPLACE_ICON, "Replace in files", replaceInFiles);
     }
   }
 

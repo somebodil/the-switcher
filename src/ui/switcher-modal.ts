@@ -2,10 +2,11 @@ import {
   type App,
   debounce,
   type Debouncer,
+  type Instruction,
   Keymap,
   type KeymapEventHandler,
-  type KeymapEventListener,
   MarkdownView,
+  type Modifier,
   Platform,
   setIcon,
   SuggestModal,
@@ -51,6 +52,9 @@ export type DialogOptions = Pick<
 >;
 
 export const MAX_RESULTS = 50;
+/** How the keys that go with others are written in the instructions */
+export const MOD_KEY = Platform.isMacOS ? "⌘" : "ctrl";
+export const ALT_KEY = Platform.isMacOS ? "⌥" : "alt";
 /** How long after the last keystroke the exclude input is saved */
 const SAVE_DELAY_MS = 1000;
 /** How much of the window stays free around a dialog that is as large as it gets */
@@ -147,6 +151,7 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
 
   override onOpen(): void {
     void super.onOpen();
+    this.showInstructions();
     // On a phone, newer versions of Obsidian have the query under the results,
     // next to the keyboard. The exclude input goes there with it.
     const queryEl = this.inputEl.parentElement;
@@ -345,48 +350,46 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
     });
   }
 
-  private bindKeys(): void {
-    const mod = Platform.isMacOS ? "⌘" : "ctrl";
-    this.setInstructions([
+  /** The keys that the row under the results tells of. */
+  protected instructions(): Instruction[] {
+    return [
       { command: "↑↓", purpose: "navigate" },
       { command: "↵", purpose: "open" },
-      { command: `${mod} ↵`, purpose: "new tab" },
-      { command: `${mod} E`, purpose: "exclude" },
-      { command: `${mod} S`, purpose: "search" },
+      { command: `${MOD_KEY} ↵`, purpose: "new tab" },
+      { command: `${MOD_KEY} E`, purpose: "exclude" },
+      { command: `${MOD_KEY} S`, purpose: "search" },
       { command: "esc", purpose: "close" },
-    ]);
+    ];
+  }
 
+  protected showInstructions(): void {
+    this.setInstructions(this.instructions());
+  }
+
+  /** Gives a key of the dialog an action. A key pressed to finish composing a character (Korean, Japanese, ...) is not one. */
+  protected registerKey(
+    modifiers: Modifier[],
+    key: string,
+    action: (evt: KeyboardEvent) => void,
+  ): void {
+    this.scope.register(modifiers, key, (evt) => {
+      if (evt.isComposing) {
+        return;
+      }
+      action(evt);
+      return false;
+    });
+  }
+
+  private bindKeys(): void {
     this.releaseHomeAndEnd();
-
-    // A key pressed to finish composing a character (Korean, Japanese, ...) is not a hotkey
-    const unlessComposing =
-      (action: (evt: KeyboardEvent) => void): KeymapEventListener =>
-      (evt) => {
-        if (evt.isComposing) {
-          return;
-        }
-        action(evt);
-        return false;
-      };
     // The key event has the modifier, which is what asks for a new tab
-    this.scope.register(
-      ["Mod"],
-      "Enter",
-      unlessComposing((evt) => this.selectActiveSuggestion(evt)),
-    );
-    this.scope.register(
-      ["Mod"],
-      "E",
-      unlessComposing(() => {
-        this.excludeEl.focus();
-        this.excludeEl.select();
-      }),
-    );
-    this.scope.register(
-      ["Mod"],
-      "S",
-      unlessComposing(() => this.inputEl.focus()),
-    );
+    this.registerKey(["Mod"], "Enter", (evt) => this.selectActiveSuggestion(evt));
+    this.registerKey(["Mod"], "E", () => {
+      this.excludeEl.focus();
+      this.excludeEl.select();
+    });
+    this.registerKey(["Mod"], "S", () => this.inputEl.focus());
   }
 
   /**

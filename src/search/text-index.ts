@@ -49,8 +49,13 @@ function toPattern(query: string): RegExp {
   return new RegExp(source, "gu");
 }
 
-/** Returns a line of a text, without its line break. */
-function lineOf(text: string, start: number, lineBreak: number): string {
+/**
+ * Returns a line of a text, without its line break.
+ *
+ * @param start where the line starts
+ * @param lineBreak where the "\n" after the line is, or -1 for the last line
+ */
+export function lineOf(text: string, start: number, lineBreak: number): string {
   let end = lineBreak === -1 ? text.length : lineBreak;
   if (end > start && text[end - 1] === "\r") {
     end--;
@@ -209,6 +214,11 @@ export class TextIndex {
   /** Adds a note or replaces its text. */
   set(path: string, text: string): void {
     this.texts.set(path, text);
+  }
+
+  /** Returns the text of a note, or undefined if the note is unknown. */
+  get(path: string): string | undefined {
+    return this.texts.get(path);
   }
 
   /** Forgets every note whose path is not among the given ones. */

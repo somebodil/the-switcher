@@ -162,7 +162,42 @@ body:not(.is-mobile) .the-switcher.prompt {
   display: inline-flex;
 }
 
-.the-switcher-status input.the-switcher-exclude {
+.the-switcher-status input.the-switcher-exclude.is-invalid {
+  color: var(--text-error);
+}
+
+.the-switcher-count {
+  font-size: var(--font-ui-smaller);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/*
+ * The row with the replacement, between the query and the exclude input. It
+ * is there while replacing, and looks like the row under it.
+ */
+.the-switcher-replace {
+  display: none;
+  align-items: center;
+  gap: var(--size-4-2);
+  padding: var(--size-2-2) var(--size-4-4);
+  border-top: 1px solid var(--background-modifier-border);
+  background-color: var(--the-switcher-bar);
+  color: var(--text-muted);
+}
+
+.the-switcher.mod-replace .the-switcher-replace {
+  display: flex;
+}
+
+/* On a phone that has the query under the results, the replacement is under the query, next to the keyboard */
+.the-switcher.mod-query-below .the-switcher-replace {
+  order: 4;
+  border-top: none;
+}
+
+.the-switcher-status input.the-switcher-exclude,
+.the-switcher-replace input.the-switcher-replace-input {
   flex: 1;
   min-width: 0;
   height: auto;
@@ -176,23 +211,48 @@ body:not(.is-mobile) .the-switcher.prompt {
 }
 
 .the-switcher-status input.the-switcher-exclude:focus,
-.the-switcher-status input.the-switcher-exclude:hover {
+.the-switcher-status input.the-switcher-exclude:hover,
+.the-switcher-replace input.the-switcher-replace-input:focus,
+.the-switcher-replace input.the-switcher-replace-input:hover {
   border: none;
   box-shadow: none;
 }
 
-.the-switcher-status input.the-switcher-exclude::placeholder {
+.the-switcher-status input.the-switcher-exclude::placeholder,
+.the-switcher-replace input.the-switcher-replace-input::placeholder {
   color: var(--text-faint);
 }
 
-.the-switcher-status input.the-switcher-exclude.is-invalid {
-  color: var(--text-error);
+.the-switcher-replace-button {
+  flex: none;
+  height: auto;
+  padding: var(--size-2-1) var(--size-4-2);
+  font-size: var(--font-ui-smaller);
+  white-space: nowrap;
 }
 
-.the-switcher-count {
-  font-size: var(--font-ui-smaller);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+/*
+ * While replacing, a match is struck out on a red background, and the
+ * replacement follows it on a green one.
+ */
+.the-switcher-old,
+.the-switcher-new {
+  border-radius: 2px;
+}
+
+.the-switcher-old {
+  background-color: rgba(var(--color-red-rgb), 0.2);
+  text-decoration: line-through;
+}
+
+.the-switcher-new {
+  background-color: rgba(var(--color-green-rgb), 0.25);
+}
+
+/* The button of the notice that tells of a replacement, under what it tells */
+.the-switcher-undo {
+  display: block;
+  margin-top: var(--size-4-2);
 }
 
 /* What every result has: its size, the highlighted matches, and what is shown on the right */

@@ -3,7 +3,7 @@
 Two dialogs for [Obsidian](https://obsidian.md) that take you where you want to be, without leaving the keyboard.
 
 - **Go to file** finds a file by its name, an alias, or its folder.
-- **Find in files** finds a text in your notes and shows the note around it.
+- **Find in files** finds a text in your notes and shows the note around it. It also replaces the text, in one line or in all your notes.
 
 In both, you pick a result and open it in the current tab or in a new one. Paths you never want to see are hidden with regular expressions, and each dialog remembers its own.
 
@@ -35,12 +35,13 @@ To update, replace the three files with the ones from a newer release and restar
 
 ## Getting started
 
-The plugin adds two commands:
+The plugin adds three commands:
 
 - **the-switcher: Go to file**
 - **the-switcher: Find in files**
+- **the-switcher: Replace in files**, which opens Find in files ready to replace
 
-Neither has a hotkey until you give it one under **Settings → Hotkeys**. Until then, run them from the command palette.
+None has a hotkey until you give it one under **Settings → Hotkeys**. Until then, run them from the command palette.
 
 ## Go to file
 
@@ -92,9 +93,24 @@ The notes are read when the dialog opens: all of them the first time, and after 
 
 A search does not hold up your typing. In a large vault it looks at the notes a few at a time, and lists the first lines while it is still looking at the rest. The number of matching lines comes last: it reads `50 / ...` until every note was looked at. A keystroke that changes the text starts the search over.
 
+## Replace in files
+
+**Replace in files** is Find in files with one more input under the query: the text to put in place of the text that is found. In the dialog, `Mod+R` switches between finding and replacing, and keeps what you typed.
+
+While you replace, each result shows its line as it will be: the text that is found is struck out on red, and the replacement follows it on green. The preview shows the note in the same way.
+
+- **One line.** `Alt+Enter` or **Replace** replaces the text in the selected line, every time the line has it. The selection goes on to the next line, so you can go through the results one by one: look at the preview, and replace the line or move on.
+- **All notes.** `Mod+Alt+Enter` or **Replace all** replaces the text in every note that has it, also in the lines that are not listed. First the dialog asks, and says how many places in how many notes will change. `Enter` replaces, and `Esc` goes back.
+- **Undo.** After a replacement, a notice says what changed, and its **Undo** button puts the notes back. A note that was changed again since then is left as it is. The notice stays for 10 seconds.
+
+What is replaced is what the search finds: the text as you typed it, whatever its case. The replacement goes in exactly as you typed it, and an empty replacement removes the text. Notes that the exclude input hides are not changed.
+
+- A note is changed from the text it has at that moment. When a line is no longer what the dialog read, nothing is replaced in it, and the results show the note as it is now.
+- What you typed in an open note and is not saved yet is saved first, so it is replaced as well.
+
 ## Keys
 
-Both dialogs have the same keys. `Mod` is `Ctrl` on Windows and Linux, and `Cmd` on macOS.
+Both dialogs have the same keys. `Mod` is `Ctrl` on Windows and Linux, and `Cmd` on macOS. `Alt` is `Option` on macOS.
 
 | Key                      | What it does             |
 | ------------------------ | ------------------------ |
@@ -104,6 +120,14 @@ Both dialogs have the same keys. `Mod` is `Ctrl` on Windows and Linux, and `Cmd`
 | `Mod+E`                  | Go to the exclude input  |
 | `Mod+S`                  | Go back to the query     |
 | `Esc`                    | Close the dialog         |
+
+Find in files has three more:
+
+| Key             | What it does                                        |
+| --------------- | --------------------------------------------------- |
+| `Mod+R`         | Switch between finding and replacing                |
+| `Alt+Enter`     | Replace in the selected line, while replacing       |
+| `Mod+Alt+Enter` | Replace in all notes, while replacing               |
 
 - A click opens a result in the current tab, and `Mod+click` in a new tab.
 - `Home` and `End` move the cursor in the input you are typing in. They do not jump through the results.
@@ -122,7 +146,7 @@ The input under the query is the exclude input. It takes JavaScript regular expr
 | `daily, weekly`     | Every path with `daily` or `weekly` in it       |
 
 - **It stays.** What you type is saved and is there the next time, also after Obsidian restarts. Empty the input to see everything again.
-- **Each dialog has its own.** Hiding a path in one dialog does not hide it in the other.
+- **Each dialog has its own.** Hiding a path in one dialog does not hide it in the other. Replace in files is Find in files, and has its exclude input.
 - **A pattern in the making does no harm.** While a pattern is not a valid regular expression, the input turns red and that pattern is left out. The other patterns still apply. `*.png` is such a pattern: a regular expression cannot start with `*`, so write `\.png$`.
 - **A comma can be part of a pattern.** It is not a separator when it is escaped (`\,`), inside square brackets (`[a,b]`), or inside a quantifier (`{1,3}`).
 
@@ -141,11 +165,12 @@ Each dialog remembers its own size. The sizes are kept on the device and not in 
 
 ## On a phone or a tablet
 
-In the mobile app the two commands are in the command palette and in the ribbon menu, each with its icon, and you can put them on the mobile toolbar. A tap on a result opens it in the current tab.
+In the mobile app the three commands are in the command palette and in the ribbon menu, each with its icon, and you can put them on the mobile toolbar. A tap on a result opens it in the current tab.
 
 - **A dialog is as large as the app makes it.** On a phone it is as wide as the screen and goes down to the keyboard. Its sides are not dragged.
 - **On a phone, Find in files has no preview.** There is no room for it, and no key that moves the selection, so there are the results only: the line, the note, and the number of the line.
-- **On a phone, the exclude input is above the query,** next to the keyboard, in versions of Obsidian that have the query under the results.
+- **On a phone, the exclude input is above the query,** next to the keyboard, in versions of Obsidian that have the query under the results. The replacement is under the query.
+- **On a phone, Replace replaces in the first result.** No key moves the selection there. After a line is replaced the next one is first, so another tap replaces that one.
 - **On a tablet, Find in files has its preview.** You drag the line between the results and the preview with a finger. With a keyboard the keys work as on a computer.
 - **On a tablet, a dialog ends above the keyboard of the screen.** When the keyboard leaves it too little room where it is, it goes up to the upper side of the screen.
 
@@ -162,7 +187,8 @@ npm run build   # type check, then the main.js of a release
 
 - `src/search` holds the searches. They know nothing about Obsidian, so their tests run with plain Node.js.
 - `src/ui` holds the dialogs.
-- `src/main.ts` adds the two commands and saves the exclude inputs.
+- `src/note-texts.ts` reads the notes for Find in files, and changes them when text is replaced.
+- `src/main.ts` adds the commands and saves the exclude inputs.
 
 To try a build, copy `main.js`, `manifest.json`, and `styles.css` to `.obsidian/plugins/the-switcher/` in a vault.
 
@@ -174,7 +200,7 @@ gh attestation verify main.js --repo somebodil/the-switcher
 
 ## Acknowledgements
 
-- Inspired by Go to File and Find in Files in [IntelliJ IDEA](https://www.jetbrains.com/idea/).
+- Inspired by Go to File, Find in Files, and Replace in Files in [IntelliJ IDEA](https://www.jetbrains.com/idea/).
 - Some ideas for the query of Go to file come from [Another Quick Switcher](https://github.com/tadashi-aikawa/obsidian-another-quick-switcher) by Tadashi Aikawa. the-switcher shares no code with it.
 
 ## License
