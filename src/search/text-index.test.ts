@@ -1,11 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import {
-  findAll,
-  type LineMatch,
-  TextIndex,
-  toSnippet,
-} from "./text-index.ts";
+import { Matcher } from "./matcher.ts";
+import { type LineMatch, TextIndex, type TextSearch, toSnippet } from "./text-index.ts";
+
+const plain = (text: string, matchCase = false): Matcher => new Matcher({ text, regex: false, matchCase });
+const regex = (text: string, matchCase = false): Matcher => new Matcher({ text, regex: true, matchCase });
 
 function indexOf(notes: Record<string, string>): TextIndex {
   const index = new TextIndex();
@@ -22,7 +21,7 @@ function find(
   paths: string[],
   limit: number,
 ): { matches: LineMatch[]; total: number } {
-  const search = index.searchOn(null, query, paths, limit);
+  const search = index.searchOn(null, plain(query), paths, limit);
   search.run();
   assert.equal(search.done, true);
   return { matches: search.matches, total: search.total };
@@ -33,68 +32,6 @@ const notes = {
   "b.md": "Budget review\r\nA Fox on line two\r\n",
   "c.md": "nothing to see",
 };
-
-describe("findAll", () => {
-  it("finds every place of the query, whatever its case", () => {
-    assert.deepEqual(findAll("fox and FOX again", "Fox"), [
-      { start: 0, end: 3 },
-      { start: 8, end: 11 },
-    ]);
-  });
-
-  it("does not let the places overlap", () => {
-    assert.deepEqual(findAll("aaaa", "aa"), [
-      { start: 0, end: 2 },
-      { start: 2, end: 4 },
-    ]);
-  });
-
-  it("finds nothing for an empty query", () => {
-    assert.deepEqual(findAll("anything", ""), []);
-  });
-
-  it("takes the characters of a regular expression as they are", () => {
-    assert.deepEqual(findAll("a.b axb (a.b)", "a.b"), [
-      { start: 0, end: 3 },
-      { start: 9, end: 12 },
-    ]);
-    assert.deepEqual(findAll("C++ and c++", "c++"), [
-      { start: 0, end: 3 },
-      { start: 8, end: 11 },
-    ]);
-    for (const query of ["[", "(", ")", "*", "?", "\\", "^", "$", "|", "{1}", "-", "/"]) {
-      assert.deepEqual(findAll(`x${query}y`, query), [
-        { start: 1, end: 1 + query.length },
-      ]);
-    }
-  });
-
-  it("gives the places in the line as it is, also next to a character that grows in lower case", () => {
-    // "İ" is one character, and two in lower case
-    assert.deepEqual(findAll("İstanbul Fox", "fox"), [{ start: 9, end: 12 }]);
-  });
-
-  it("finds an emoji", () => {
-    assert.deepEqual(findAll("a 📝 b", "📝"), [{ start: 2, end: 4 }]);
-  });
-
-  it("does not fail on half an emoji, and does not find it in a whole one", () => {
-    assert.deepEqual(findAll("a 📝 b", "📝".slice(0, 1)), []);
-    assert.deepEqual(findAll("a 📝 b", "📝".slice(1)), []);
-  });
-
-  it("finds a letter that has no single letter in upper case as it is", () => {
-    assert.deepEqual(findAll("Straße STRASSE", "straße"), [{ start: 0, end: 6 }]);
-  });
-
-  it("finds letters outside the basic plane whatever their case", () => {
-    // Deseret: "𐐨" is the lower case of "𐐀"
-    assert.deepEqual(findAll("𐐀 𐐨", "𐐨"), [
-      { start: 0, end: 2 },
-      { start: 3, end: 5 },
-    ]);
-  });
-});
 
 describe("TextIndex.search", () => {
   const index = indexOf(notes);
@@ -238,20 +175,20 @@ describe("TextSearch.run", () => {
   const paths = Object.keys(many);
 
   it("finds nothing before it is run", () => {
-    const search = index.searchOn(null, "fox", paths, 5);
+    const search = index.searchOn(null, plain("fox"), paths, 5);
     assert.equal(search.done, false);
     assert.equal(search.total, 0);
     assert.deepEqual(search.matches, []);
   });
 
   it("is done at once when there is nothing to look for or nowhere to look", () => {
-    assert.equal(index.searchOn(null, "", paths, 5).done, true);
-    assert.equal(index.searchOn(null, " ", paths, 5).done, true);
-    assert.equal(index.searchOn(null, "fox", [], 5).done, true);
+    assert.equal(index.searchOn(null, plain(""), paths, 5).done, true);
+    assert.equal(index.searchOn(null, plain(" "), paths, 5).done, true);
+    assert.equal(index.searchOn(null, plain("fox"), [], 5).done, true);
   });
 
   it("pauses when it is told to, and goes on where it stopped", () => {
-    const search = index.searchOn(null, "fox", paths, 5);
+    const search = index.searchOn(null, plain("fox"), paths, 5);
     search.run(() => true);
     assert.equal(search.done, false);
     assert.equal(search.total, 2);
@@ -275,7 +212,7 @@ describe("TextSearch.run", () => {
   it("finds the same in parts as in one go", () => {
     const whole = find(index, "fox", paths, 7);
     for (const every of [1, 2, 3, 7, 19, 20, 21]) {
-      const search = index.searchOn(null, "fox", paths, 7);
+      const search = index.searchOn(null, plain("fox"), paths, 7);
       let runs = 0;
       while (!search.done) {
         let notes = 0;
@@ -291,20 +228,20 @@ describe("TextSearch.run", () => {
   });
 
   it("is done after the last note, also when it pauses there", () => {
-    const search = index.searchOn(null, "fox", ["n00.md"], 5);
+    const search = index.searchOn(null, plain("fox"), ["n00.md"], 5);
     search.run(() => true);
     assert.equal(search.done, true);
   });
 
   it("does nothing more once it is done", () => {
-    const search = index.searchOn(null, "fox", paths, 5);
+    const search = index.searchOn(null, plain("fox"), paths, 5);
     search.run();
     search.run();
     assert.equal(search.total, 40);
   });
 
   it("skips a path without a note", () => {
-    const search = index.searchOn(null, "fox", ["gone.md", "n00.md", "gone.md"], 5);
+    const search = index.searchOn(null, plain("fox"), ["gone.md", "n00.md", "gone.md"], 5);
     search.run();
     assert.equal(search.done, true);
     assert.equal(search.total, 2);
@@ -363,55 +300,65 @@ describe("TextIndex.excerpt", () => {
 });
 
 describe("toSnippet", () => {
-  const match = (text: string, query: string) => ({
-    path: "n.md",
-    line: 0,
-    text,
-    ranges: findAll(text, query),
-  });
+  const snip = (text: string, query: string, length: number, keepIndentation = false) =>
+    toSnippet(text, plain(query).findAll(text), length, keepIndentation);
 
   it("drops the indentation and moves the ranges with the text", () => {
-    assert.deepEqual(toSnippet(match("    - a fox here", "fox"), 80), {
+    assert.deepEqual(snip("    - a fox here", "fox", 80), {
       text: "- a fox here",
       ranges: [{ start: 4, end: 7 }],
     });
   });
 
-  it("keeps the part of a match that starts in the indentation", () => {
-    assert.deepEqual(toSnippet(match("    - a fox", " - "), 80), {
-      text: "- a fox",
-      ranges: [{ start: 0, end: 2 }],
+  it("keeps the indentation when told to", () => {
+    assert.deepEqual(snip("    - a fox here", "fox", 80, true), {
+      text: "    - a fox here",
+      ranges: [{ start: 8, end: 11 }],
     });
-    assert.deepEqual(toSnippet(match("\t\tfox", "\tfox"), 80), {
-      text: "fox",
+  });
+
+  it("shows a match that starts in the indentation whole", () => {
+    assert.deepEqual(snip("    - a fox", " - ", 80), {
+      text: " - a fox",
       ranges: [{ start: 0, end: 3 }],
+    });
+    assert.deepEqual(snip("\t\tfox", "\tfox", 80), {
+      text: "\tfox",
+      ranges: [{ start: 0, end: 4 }],
     });
   });
 
   it("leaves out a match that is all in the indentation", () => {
-    assert.deepEqual(toSnippet(match("    fox", "  "), 80), {
+    assert.deepEqual(snip("    fox", "  ", 80), {
       text: "fox",
       ranges: [],
     });
   });
 
-  it("keeps the part of a match that the cut goes through, and leaves out what comes after", () => {
-    const snippet = toSnippet(match(`fox ${"x".repeat(44)}fox fox`, "fox"), 50);
-    assert.equal(snippet.text, `fox ${"x".repeat(44)}fo`);
+  it("shows a match that the cut goes through whole, and leaves out what comes after", () => {
+    const snippet = snip(`fox ${"x".repeat(44)}fox fox`, "fox", 50);
+    assert.equal(snippet.text, `fox ${"x".repeat(44)}fox…`);
     assert.deepEqual(snippet.ranges, [
       { start: 0, end: 3 },
-      { start: 48, end: 50 },
+      { start: 48, end: 51 },
     ]);
   });
 
-  it("cuts a long line after the given number of characters", () => {
-    const snippet = toSnippet(match(`fox ${"x".repeat(200)}`, "fox"), 50);
-    assert.equal(snippet.text.length, 50);
+  it("cuts a match that is longer than twice the line it shows", () => {
+    const line = `a ${"b".repeat(300)}`;
+    const snippet = toSnippet(line, [{ start: 2, end: 302 }], 50);
+    assert.equal(snippet.text, `${line.slice(0, 50)}…`);
+    assert.deepEqual(snippet.ranges, [{ start: 2, end: 50 }]);
+  });
+
+  it("cuts a long line after the given number of characters, with an ellipsis", () => {
+    const snippet = snip(`fox ${"x".repeat(200)}`, "fox", 50);
+    assert.equal(snippet.text, `fox ${"x".repeat(46)}…`);
     assert.deepEqual(snippet.ranges, [{ start: 0, end: 3 }]);
   });
 
   it("starts shortly before a match that is far into the line", () => {
-    const snippet = toSnippet(match(`${"a".repeat(100)} fox tail`, "fox"), 60);
+    const snippet = snip(`${"a".repeat(100)} fox tail`, "fox", 60);
     assert.equal(snippet.text.startsWith("…"), true);
     const [range] = snippet.ranges;
     assert.ok(range);
@@ -419,8 +366,38 @@ describe("toSnippet", () => {
     assert.equal(snippet.text.endsWith(" fox tail"), true);
   });
 
+  it("does not cut a character outside the basic plane in half", () => {
+    const line = `${"📝".repeat(30)}fox`;
+    for (const length of [9, 10, 11, 12]) {
+      const snippet = snip(line, "fox", length);
+      assert.doesNotMatch(snippet.text, /\p{Cs}/u, `${length}`);
+      const [range] = snippet.ranges;
+      assert.ok(range, `${length}`);
+      assert.equal(snippet.text.slice(range.start, range.end), "fox");
+    }
+    assert.equal(snip("📝📝📝", "zzz", 3).text, "📝📝…");
+  });
+
+  it("keeps a match of nothing at either end of what it shows", () => {
+    assert.deepEqual(toSnippet("abc", [{ start: 0, end: 0 }, { start: 3, end: 3 }], 80), {
+      text: "abc",
+      ranges: [
+        { start: 0, end: 0 },
+        { start: 3, end: 3 },
+      ],
+    });
+    assert.deepEqual(toSnippet("  abc", [{ start: 0, end: 0 }], 80).ranges, []);
+  });
+
+  it("keeps what else the ranges have", () => {
+    assert.deepEqual(toSnippet("  ab", [{ start: 2, end: 3, text: "x" }], 80), {
+      text: "ab",
+      ranges: [{ start: 0, end: 1, text: "x" }],
+    });
+  });
+
   it("leaves a line without a match as it is, apart from the indentation", () => {
-    assert.deepEqual(toSnippet(match("  plain line", "zzz"), 80), {
+    assert.deepEqual(snip("  plain line", "zzz", 80), {
       text: "plain line",
       ranges: [],
     });
@@ -441,12 +418,12 @@ describe("TextIndex.searchOn", () => {
 
   it("finds what a search of all notes finds, while a query is typed key by key", () => {
     for (const query of ["fox hunt", "Fox", "가계부 정", "foxes", "zz", "a quick fox"]) {
-      let before: ReturnType<TextIndex["searchOn"]> | null = null;
+      let before: TextSearch | null = null;
       for (let i = 1; i <= query.length; i++) {
         const typed = query.slice(0, i);
-        const on = index.searchOn(before, typed, paths, 7);
+        const on = index.searchOn(before, plain(typed), paths, 7);
         on.run();
-        const all = index.searchOn(null, typed, paths, 7);
+        const all = index.searchOn(null, plain(typed), paths, 7);
         all.run();
         assert.deepEqual([on.matches, on.total, on.found], [all.matches, all.total, all.found], `"${typed}"`);
         before = on;
@@ -455,27 +432,199 @@ describe("TextIndex.searchOn", () => {
   });
 
   it("looks at all notes after a search that is not done, and after a query that this one does not have in it", () => {
-    const half = index.searchOn(null, "fox", paths, 7);
+    const half = index.searchOn(null, plain("fox"), paths, 7);
     half.run(() => true);
     assert.equal(half.done, false);
-    const afterHalf = index.searchOn(half, "foxes", paths, 7);
+    const afterHalf = index.searchOn(half, plain("foxes"), paths, 7);
     afterHalf.run();
-    const all = index.searchOn(null, "foxes", paths, 7);
+    const all = index.searchOn(null, plain("foxes"), paths, 7);
     all.run();
     assert.deepEqual([afterHalf.matches, afterHalf.total], [all.matches, all.total]);
 
-    const quick = index.searchOn(null, "quick", paths, 7);
+    const quick = index.searchOn(null, plain("quick"), paths, 7);
     quick.run();
-    const other = index.searchOn(quick, "hunting", paths, 7);
+    const other = index.searchOn(quick, plain("hunting"), paths, 7);
     other.run();
     assert.equal(other.total, 15);
     // Nothing was typed yet: every note is still to be looked at
-    const blank = index.searchOn(null, " ", paths, 7);
-    const afterBlank = index.searchOn(blank, " fox", paths, 7);
+    const blank = index.searchOn(null, plain(" "), paths, 7);
+    const afterBlank = index.searchOn(blank, plain(" fox"), paths, 7);
     afterBlank.run();
-    const allOfIt = index.searchOn(null, " fox", paths, 7);
+    const allOfIt = index.searchOn(null, plain(" fox"), paths, 7);
     allOfIt.run();
     assert.ok(allOfIt.total > 0);
     assert.deepEqual([afterBlank.matches, afterBlank.total], [allOfIt.matches, allOfIt.total]);
+  });
+});
+
+/** What a search for a regular expression has to find: each line tried by itself */
+function lineByLine(
+  texts: Record<string, string>,
+  source: string,
+  flags: string,
+  paths: string[],
+  limit: number,
+): { lines: [string, number, string][]; total: number; found: string[] } {
+  const pattern = new RegExp(source, flags);
+  const lines: [string, number, string][] = [];
+  const found: string[] = [];
+  let total = 0;
+  for (const path of paths) {
+    const text = texts[path];
+    if (text === undefined) {
+      continue;
+    }
+    // As in Vim, a final line break ends the last line and starts no other
+    const raws = text.split("\n");
+    if (raws.length > 1 && raws[raws.length - 1] === "") {
+      raws.pop();
+    }
+    raws.forEach((raw, line) => {
+      const lineText = raw.endsWith("\r") ? raw.slice(0, -1) : raw;
+      if (pattern.test(lineText)) {
+        total++;
+        if (found[found.length - 1] !== path) {
+          found.push(path);
+        }
+        if (lines.length < limit) {
+          lines.push([path, line, lineText]);
+        }
+      }
+    });
+  }
+  return { lines, total, found };
+}
+
+describe("TextIndex.search with a regular expression", () => {
+  const texts: Record<string, string> = {
+    "a.md": "# Alpha\n\nThe quick brown fox.\nNo animal here.\nfox and FOX again",
+    "b.md": "Budget review\r\nA Fox on line two\r\n\r\n  indented fox\r",
+    "c.md": "nothing to see",
+    "d.md": "a\nb\n\n\nab\nba\n\u2028x\ry\nend",
+    "e.md": "📝 note\n𐐀 deseret 𐐨\n가계부 fox 정산\n\tTab\there\n",
+    "f.md": "",
+    "g.md": "\n\n",
+    "h.md": "foo bar\nbar foo\nfoofoo\nfo\no\n",
+  };
+  const index = new TextIndex();
+  for (const [path, text] of Object.entries(texts)) {
+    index.set(path, text);
+  }
+  const paths = Object.keys(texts);
+  const sources = [
+    "fox", "^fox", "fox$", "\\.$", "^$", "^", "$", "x*", "\\b", "o\\s*x", "a\\s+b", "[^a]+",
+    "\\s", "^\\s+\\w", "(?<=\\s)fox", "(?<!\\s)fox", "fox(?=\\.)", "fox(?!\\s)", "(?<!.)\\w",
+    "\\w(?![\\s\\S])", "^.$", "📝", "\\p{L}+", "𐐨", "(o)\\1", "foo|bar", "^(foo|bar) (foo|bar)$",
+    "\\r", "\\n", "y$", "^y", "\\t", ".", "end$", "\\u2028", "^x",
+  ];
+
+  it("finds the lines that the pattern matches by themselves", () => {
+    for (const source of sources) {
+      for (const matchCase of [false, true]) {
+        for (const limit of [0, 2, 100]) {
+          const matcher = regex(source, matchCase);
+          const search = index.searchOn(null, matcher, paths, limit);
+          search.run();
+          const expected = lineByLine(texts, source, matchCase ? "u" : "iu", paths, limit);
+          const label = `/${source}/ ${matchCase ? "case" : "any case"} limit ${limit}`;
+          assert.deepEqual(
+            search.matches.map((match) => [match.path, match.line, match.text]),
+            expected.lines,
+            label,
+          );
+          assert.equal(search.total, expected.total, label);
+          assert.deepEqual(search.found, expected.found, label);
+          for (const match of search.matches) {
+            assert.deepEqual(match.ranges, matcher.findAll(match.text), label);
+            assert.ok(match.ranges.length > 0, label);
+          }
+        }
+      }
+    }
+  });
+
+  it("finds the same in parts as in one go", () => {
+    for (const source of ["fox", "^", "(?<!\\s)fox", "o\\s*x"]) {
+      const whole = index.searchOn(null, regex(source), paths, 3);
+      whole.run();
+      const parts = index.searchOn(null, regex(source), paths, 3);
+      while (!parts.done) {
+        parts.run(() => true);
+      }
+      assert.deepEqual([parts.matches, parts.total, parts.found], [whole.matches, whole.total, whole.found], source);
+    }
+  });
+
+  it("looks only at the notes of a search for the same query, and at all of them for a regular expression typed on", () => {
+    const fox = index.searchOn(null, regex("fox"), paths, 100);
+    fox.run();
+    const again = index.searchOn(fox, regex("fox"), paths, 100);
+    again.run();
+    assert.deepEqual([again.matches, again.total], [fox.matches, fox.total]);
+
+    // "fox|a" has "fox" in it, and finds lines that "fox" does not
+    const wider = index.searchOn(fox, regex("fox|a"), paths, 100);
+    wider.run();
+    const all = index.searchOn(null, regex("fox|a"), paths, 100);
+    all.run();
+    assert.deepEqual([wider.matches, wider.total], [all.matches, all.total]);
+    assert.ok(all.total > fox.total);
+
+    // A plain query of before does not narrow a regular expression, nor the other way around
+    const plainFox = index.searchOn(null, plain("fox"), paths, 100);
+    plainFox.run();
+    const fromPlain = index.searchOn(plainFox, regex("fox|a"), paths, 100);
+    fromPlain.run();
+    assert.equal(fromPlain.total, all.total);
+    const toPlain = index.searchOn(wider, plain("fox|a"), paths, 100);
+    toPlain.run();
+    assert.equal(toPlain.total, 0);
+  });
+
+  it("narrows a plain query only with the same switch for the case", () => {
+    const anyCase = index.searchOn(null, plain("Fox", true), paths, 100);
+    anyCase.run();
+    const typedOn = index.searchOn(anyCase, plain("fox a"), paths, 100);
+    typedOn.run();
+    const all = index.searchOn(null, plain("fox a"), paths, 100);
+    all.run();
+    assert.deepEqual([typedOn.matches, typedOn.total], [all.matches, all.total]);
+  });
+});
+
+describe("TextSearch.run with notes that are not ready", () => {
+  const index = new TextIndex();
+  for (const [path, text] of [["a.md", "fox"], ["b.md", "fox"], ["c.md", "fox"]]) {
+    index.set(path, text);
+  }
+  const paths = ["a.md", "b.md", "c.md"];
+
+  it("waits at the first note that is not ready, and goes on once it is", () => {
+    const ready = new Set(["a.md"]);
+    const search = index.searchOn(null, regex("fox"), paths, 10);
+    search.run(undefined, (path) => ready.has(path));
+    assert.deepEqual([search.total, search.done, search.isWaiting], [1, false, true]);
+    ready.add("c.md");
+    search.run(undefined, (path) => ready.has(path));
+    assert.deepEqual([search.total, search.done, search.isWaiting], [1, false, true]);
+    ready.add("b.md");
+    search.run(undefined, (path) => ready.has(path));
+    assert.deepEqual([search.total, search.done, search.isWaiting], [3, true, false]);
+  });
+});
+
+describe("TextIndex.versionOf", () => {
+  it("gives a new number each time a text is set, and none for a note that is forgotten", () => {
+    const index = new TextIndex();
+    assert.equal(index.versionOf("a.md"), undefined);
+    index.set("a.md", "one");
+    const first = index.versionOf("a.md");
+    index.set("b.md", "two");
+    index.set("a.md", "one");
+    assert.ok(first !== undefined && index.versionOf("a.md") !== first);
+    index.delete("a.md");
+    assert.equal(index.versionOf("a.md"), undefined);
+    index.retain(new Set());
+    assert.equal(index.versionOf("b.md"), undefined);
   });
 });

@@ -381,8 +381,14 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
     });
   }
 
+  /** What Enter does: it opens the selected result. */
+  protected onEnter(evt: KeyboardEvent): void {
+    this.selectActiveSuggestion(evt);
+  }
+
   private bindKeys(): void {
-    this.releaseHomeAndEnd();
+    this.takeOverKeys();
+    this.registerKey([], "Enter", (evt) => this.onEnter(evt));
     // The key event has the modifier, which is what asks for a new tab
     this.registerKey(["Mod"], "Enter", (evt) => this.selectActiveSuggestion(evt));
     this.registerKey(["Mod"], "E", () => {
@@ -393,21 +399,23 @@ export abstract class SwitcherModal<T> extends SuggestModal<T> {
   }
 
   /**
-   * Gives Home and End back to the inputs, where they move the cursor. The
-   * list of results takes them to jump to its first and its last result.
+   * Takes Enter, Home and End from the list of results. The list takes them to
+   * open the selected result, and to jump to its first and its last result. The
+   * dialog gives Enter an action of its own, and gives Home and End back to the
+   * inputs, where they move the cursor.
    *
    * A scope hands a key to the handler that was registered first, so a handler
    * of this dialog could not get ahead of the ones of the list. They have to
    * be taken out, and the scope does not tell its handlers in the public API.
    */
-  private releaseHomeAndEnd(): void {
+  private takeOverKeys(): void {
     const { keys } = this.scope as unknown as { keys?: KeymapEventHandler[] };
     if (!Array.isArray(keys)) {
       return;
     }
     for (const handler of [...keys]) {
       if (
-        (handler.key === "Home" || handler.key === "End") &&
+        (handler.key === "Enter" || handler.key === "Home" || handler.key === "End") &&
         !handler.modifiers
       ) {
         this.scope.unregister(handler);

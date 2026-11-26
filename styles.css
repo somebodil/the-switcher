@@ -173,6 +173,42 @@ body:not(.is-mobile) .the-switcher.prompt {
 }
 
 /*
+ * The switches for how the query is taken: match case and regular expression.
+ * They are in the input of the query, before the button that clears it, and
+ * the input leaves room for them. A switch that is on has the accent colour.
+ */
+.the-switcher-switches {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  inset-inline-end: calc(var(--size-4-4) + 28px + var(--size-2-2));
+  display: flex;
+  align-items: center;
+  gap: var(--size-2-1);
+}
+
+.the-switcher-switch {
+  --icon-size: var(--icon-s);
+}
+
+.the-switcher-switch.is-active,
+.the-switcher-switch.is-active:hover {
+  background-color: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* More particular than the padding that the mobile app gives the input, with and without text in it */
+.the-switcher-text .prompt-input-container input.prompt-input,
+.the-switcher-text .prompt-input-container input.prompt-input:not(:placeholder-shown) {
+  padding-inline-end: calc(var(--size-4-12) + 64px);
+}
+
+/* A regular expression that is not valid */
+.the-switcher-text .prompt-input.is-invalid {
+  color: var(--text-error);
+}
+
+/*
  * The row with the replacement, between the query and the exclude input. It
  * is there while replacing, and looks like the row under it.
  */

@@ -2,7 +2,7 @@ import { Platform, Plugin } from "obsidian";
 import { NoteTexts } from "./note-texts.ts";
 import { KeptIndex } from "./search/file-index.ts";
 import { FileModal } from "./ui/file-modal.ts";
-import { TextModal } from "./ui/text-modal.ts";
+import { type SearchSwitches, TextModal } from "./ui/text-modal.ts";
 
 /** Everything the plugin keeps between sessions: what was typed into the exclude inputs. */
 interface PluginData {
@@ -27,6 +27,8 @@ export default class TheSwitcherPlugin extends Plugin {
   /** What each of the two dialogs worked out for the files the last time it was open, so that it is ready sooner the next time */
   private readonly keptFiles = new KeptIndex();
   private readonly keptNotes = new KeptIndex();
+  /** How the query of the text dialog is taken: kept while Obsidian runs, and not written to data.json */
+  private readonly switches: SearchSwitches = { regex: false, matchCase: false };
 
   override async onload(): Promise<void> {
     await this.readData();
@@ -40,6 +42,7 @@ export default class TheSwitcherPlugin extends Plugin {
         ...this.excludeOptions("textExclude"),
         kept: this.keptNotes,
         replacing,
+        switches: this.switches,
       }).open();
     };
     const findInFiles = textDialog(false);
@@ -73,6 +76,10 @@ export default class TheSwitcherPlugin extends Plugin {
       this.addRibbonIcon(TEXT_ICON, "Find in files", findInFiles);
       this.addRibbonIcon(REPLACE_ICON, "Replace in files", replaceInFiles);
     }
+  }
+
+  override onunload(): void {
+    this.noteTexts.guard.dispose();
   }
 
   /**

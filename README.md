@@ -3,7 +3,7 @@
 Two dialogs for [Obsidian](https://obsidian.md) that take you where you want to be, without leaving the keyboard.
 
 - **Go to file** finds a file by its name, an alias, or its folder.
-- **Find in files** finds a text in your notes and shows the note around it. It also replaces the text, in one line or in all your notes.
+- **Find in files** finds a text in your notes, or what a regular expression matches, and shows the note around it. It also replaces what it finds, in one line or in all your notes, with groups and case changes as in Vim.
 
 In both, you pick a result and open it in the current tab or in a new one. Paths you never want to see are hidden with regular expressions, and each dialog remembers its own.
 
@@ -51,14 +51,14 @@ The dialog lists the files of your vault, of every type. The file you are lookin
 
 Words are separated by spaces, and a file has to match all of them. Upper and lower case are the same, and spaces inside names do not count: `alphabeta` finds `Alpha Beta`.
 
-| You type       | You get                                                                  |
-| -------------- | ------------------------------------------------------------------------ |
-| `alpha`        | Files with `alpha` in the name, in an alias, or in the folder path       |
-| `alpha beta`   | Files that match both words, in any order                                |
-| `"alpha beta"` | Files that match the two words next to each other                        |
-| `-alpha`       | Everything except what `alpha` matches                                   |
-| `Notes/`       | Files in a folder whose path has `Notes`                                 |
-| `Notes/alpha`  | Of those, the files with `alpha` in the name or in an alias              |
+| You type       | You get                                                            |
+| -------------- | ------------------------------------------------------------------ |
+| `alpha`        | Files with `alpha` in the name, in an alias, or in the folder path |
+| `alpha beta`   | Files that match both words, in any order                          |
+| `"alpha beta"` | Files that match the two words next to each other                  |
+| `-alpha`       | Everything except what `alpha` matches                             |
+| `Notes/`       | Files in a folder whose path has `Notes`                           |
+| `Notes/alpha`  | Of those, the files with `alpha` in the name or in an alias        |
 
 - Files other than Markdown notes show their extension and are found by it. `png` lists the PNG images.
 - A result shows the full path of the file, with the name of the file standing out. A path that is too long for the row is cut in its middle, and the name always stays: `Projects/2026…/Notes/Alpha`. What the query matches in the folders is marked too, in a softer colour than a match in the name.
@@ -79,8 +79,8 @@ Emoji are skipped in steps 1 and 2, so `📝 Memo` starts with `memo` and is lis
 
 Type a text, and the dialog lists every line of your Markdown notes that has it, with the name of the note and the number of the line.
 
-- The text is taken as you type it, spaces included. There are no wildcards and no operators.
-- Upper and lower case are the same.
+- The text is taken as you type it, spaces included, unless the regular expression switch is on.
+- Upper and lower case are the same, unless the match case switch is on.
 - A line is listed once, however often it has the text.
 
 Under the results, the dialog shows the note around the selected line, with the text highlighted. This preview follows the selection as you move through the results.
@@ -89,9 +89,45 @@ Opening a result opens the note at that line, with the text selected.
 
 The results are ordered by note, alphabetically by the name of the note, and within a note from the top line down.
 
-The notes are read when the dialog opens: all of them the first time, and after that only the ones that changed. In a large vault the first time takes a moment, and the dialog says `Reading the notes...` until it is done.
+The notes are read when the dialog opens: all of them the first time, and after that only the ones that changed. In a large vault the first time takes a moment, and the dialog says `Reading the notes...` until it is done. A note that is open in an editor is searched as the editor has it, with what you typed and is not saved yet.
 
 A search does not hold up your typing. In a large vault it looks at the notes a few at a time, and lists the first lines while it is still looking at the rest. The number of matching lines comes last: it reads `50 / ...` until every note was looked at. A keystroke that changes the text starts the search over.
+
+### Match case and regular expressions
+
+Two switches at the right end of the query change how it is taken. A click turns one on or off, and so does its key, which its tooltip tells.
+
+| Switch             | Key     | When it is on                                  |
+| ------------------ | ------- | ---------------------------------------------- |
+| Match case         | `Alt+C` | Only the text with the case you typed is found |
+| Regular expression | `Alt+R` | The query is a JavaScript regular expression   |
+
+The switches stay as you left them until Obsidian closes. Find in files and Replace in files share them.
+
+### Regular expressions
+
+With the regular expression switch on, the query is a [JavaScript regular expression](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions). That is close to a search of Vim with `\v`: `(`, `)`, `|`, `+`, `?` and `{` have their meaning without a backslash.
+
+- **Line by line.** Each line is matched by itself. `^` and `$` are the start and the end of a line, and a match does not go on into the next line. As in Vim, the line break at the end of a note ends its last line, and no empty line follows it.
+- **Unicode.** `.` is one character, also for an emoji, and `\p{L}` is a letter of any script.
+- **A backslash too many does no harm.** A backslash before a character that means nothing in a pattern, as in `\#` or `\-`, stands for that character.
+- **A pattern in the making.** While the query is not a valid regular expression, such as `(\w+`, it turns red and the dialog says what is wrong with it.
+- **Matches of nothing.** A pattern such as `^` or `\b` matches no text, and the lines where it matches are listed.
+
+| Query                | Finds                                       |
+| -------------------- | ------------------------------------------- |
+| `colou?r`            | `color` and `colour`                        |
+| `\bTODO\b`           | `TODO` as a word, and not in `TODOS`        |
+| `^\s*- \[ \]`        | Tasks that are not done                     |
+| `\[\[([^\]\|]+)`     | Links, with the name of the note in a group |
+| `^$`                 | Empty lines                                 |
+| `\p{Script=Hangul}+` | Korean words                                |
+
+#### A pattern that takes too long
+
+Some patterns try a vast number of ways to match a line before they give up, and a match cannot be stopped once it started. `(\w+\s?)+$` can take half a minute on a sentence that ends with a full stop. So a regular expression is first tried on the notes in the background, and the dialog looks only at the notes where it was quick. When a note takes more than a second, the dialog says that the regular expression takes too long, and in which note, while Obsidian goes on as before. Change the query, and the search starts again.
+
+What makes a pattern slow is mostly a repeat inside a repeat, as in `(\w+\s?)+`. With one repeat, as in `[\w\s]+$`, it is quick.
 
 ## Replace in files
 
@@ -103,31 +139,60 @@ While you replace, each result shows its line as it will be: the text that is fo
 - **All notes.** `Mod+Alt+Enter` or **Replace all** replaces the text in every note that has it, also in the lines that are not listed. First the dialog asks, and says how many places in how many notes will change. `Enter` replaces, and `Esc` goes back.
 - **Undo.** After a replacement, a notice says what changed, and its **Undo** button puts the notes back. A note that was changed again since then is left as it is. The notice stays for 10 seconds.
 
-What is replaced is what the search finds: the text as you typed it, whatever its case. The replacement goes in exactly as you typed it, and an empty replacement removes the text. Notes that the exclude input hides are not changed.
+What is replaced is what the search finds, as the switches say. The replacement goes in exactly as you typed it, and an empty replacement removes the text. Notes that the exclude input hides are not changed.
 
+- In the replacement input, `Enter` replaces in the selected line as well. In the query, it opens the selected line.
 - A note is changed from the text it has at that moment. When a line is no longer what the dialog read, nothing is replaced in it, and the results show the note as it is now.
 - What you typed in an open note and is not saved yet is saved first, so it is replaced as well.
+- A note that was deleted or renamed since the dialog read it, or that cannot be written, is left as it is, and a notice names it.
+- Obsidian takes a moment to write each note. While it writes many, the row under the query counts them, as in `Replacing: 640 of 2000 notes`.
+
+### Replacing with a regular expression
+
+With the regular expression switch on, the replacement can bring in what each match has, as in a `:s` command of Vim or in JavaScript:
+
+| In the replacement          | Puts in                                                        |
+| --------------------------- | -------------------------------------------------------------- |
+| `\1` to `\9`, `$1` to `$99` | A group of the match                                           |
+| `$<name>`                   | A named group, `(?<name>...)` in the query                     |
+| `&`, `\0`, `$&`, `$0`       | The whole match                                                |
+| `\n`, `\r`, `\r\n`          | A line break, of the kind that the note has: `\r\n` or `\n`    |
+| `\t`                        | A tab                                                          |
+| `\u`, `\l`                  | The next character in upper or lower case                      |
+| `\U`, `\L`                  | What follows in upper or lower case, until `\E` or `\e`        |
+| `\&`, `\$`, `\\`            | The character itself, as a backslash does before any other one |
+| `$$`                        | `$`                                                            |
+
+The query `(\w+)@(\w+)\.com` with the replacement `\U\2\E: \1` makes `anna@example.com` into `EXAMPLE: anna`.
+
+- A group that the query does not have puts in nothing after a backslash. After `$` it stays as you typed it, as in JavaScript.
+- `$12` is group 12 when the query has twelve groups, and otherwise group 1 followed by `2`.
+- A line break that the replacement puts in shows as `↵` in the results.
+- A note that changed after the search, as by a sync, is left as it is, and a notice names it: on a new line the regular expression could take too long. The results then show the note as it is now.
+- With the switch off, the replacement is taken as you type it: `&` is `&`, and `\1` is `\1`.
 
 ## Keys
 
 Both dialogs have the same keys. `Mod` is `Ctrl` on Windows and Linux, and `Cmd` on macOS. `Alt` is `Option` on macOS.
 
-| Key                      | What it does             |
-| ------------------------ | ------------------------ |
-| `↑` `↓`                  | Move through the results |
-| `Enter`                  | Open in the current tab  |
-| `Mod+Enter`              | Open in a new tab        |
-| `Mod+E`                  | Go to the exclude input  |
-| `Mod+S`                  | Go back to the query     |
-| `Esc`                    | Close the dialog         |
+| Key         | What it does             |
+| ----------- | ------------------------ |
+| `↑` `↓`     | Move through the results |
+| `Enter`     | Open in the current tab  |
+| `Mod+Enter` | Open in a new tab        |
+| `Mod+E`     | Go to the exclude input  |
+| `Mod+S`     | Go back to the query     |
+| `Esc`       | Close the dialog         |
 
-Find in files has three more:
+Find in files has five more:
 
-| Key             | What it does                                        |
-| --------------- | --------------------------------------------------- |
-| `Mod+R`         | Switch between finding and replacing                |
-| `Alt+Enter`     | Replace in the selected line, while replacing       |
-| `Mod+Alt+Enter` | Replace in all notes, while replacing               |
+| Key             | What it does                                  |
+| --------------- | --------------------------------------------- |
+| `Mod+R`         | Switch between finding and replacing          |
+| `Alt+C`         | Turn match case on or off                     |
+| `Alt+R`         | Turn regular expressions on or off            |
+| `Alt+Enter`     | Replace in the selected line, while replacing |
+| `Mod+Alt+Enter` | Replace in all notes, while replacing         |
 
 - A click opens a result in the current tab, and `Mod+click` in a new tab.
 - `Home` and `End` move the cursor in the input you are typing in. They do not jump through the results.
@@ -138,12 +203,12 @@ Find in files has three more:
 
 The input under the query is the exclude input. It takes JavaScript regular expressions, separated by commas. A file is hidden when one of them matches its path, counted from the root of the vault. Upper and lower case are the same.
 
-| Exclude input       | What is hidden                                  |
-| ------------------- | ----------------------------------------------- |
-| `^Archive/`         | Everything in the top-level folder `Archive`    |
-| `(^\|/)_templates/` | Every folder called `_templates`, however deep  |
-| `^Archive/, \.png$` | The folder `Archive`, and every PNG image       |
-| `daily, weekly`     | Every path with `daily` or `weekly` in it       |
+| Exclude input       | What is hidden                                 |
+| ------------------- | ---------------------------------------------- |
+| `^Archive/`         | Everything in the top-level folder `Archive`   |
+| `(^\|/)_templates/` | Every folder called `_templates`, however deep |
+| `^Archive/, \.png$` | The folder `Archive`, and every PNG image      |
+| `daily, weekly`     | Every path with `daily` or `weekly` in it      |
 
 - **It stays.** What you type is saved and is there the next time, also after Obsidian restarts. Empty the input to see everything again.
 - **Each dialog has its own.** Hiding a path in one dialog does not hide it in the other. Replace in files is Find in files, and has its exclude input.
@@ -188,6 +253,7 @@ npm run build   # type check, then the main.js of a release
 - `src/search` holds the searches. They know nothing about Obsidian, so their tests run with plain Node.js.
 - `src/ui` holds the dialogs.
 - `src/note-texts.ts` reads the notes for Find in files, and changes them when text is replaced.
+- `src/regex-guard.ts` has `src/regex-worker.ts` try a regular expression on the notes in a worker, before a search looks at them. A plugin has one file of code, so `esbuild.config.mjs` builds the worker by itself and puts its code into `main.js` as a text.
 - `src/main.ts` adds the commands and saves the exclude inputs.
 
 To try a build, copy `main.js`, `manifest.json`, and `styles.css` to `.obsidian/plugins/the-switcher/` in a vault.
