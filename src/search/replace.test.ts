@@ -107,6 +107,14 @@ describe("replaceAll with a regular expression", () => {
     assert.equal(substitute("ǆ", ".", "\\u&"), "Ǆ");
   });
 
+  it("changes the case of what \\U or \\L covers as a whole, as of a word", () => {
+    // A Greek sigma in lower case is final only at the end of a word
+    assert.equal(substitute("ΑΣΩ", "(ΑΣ)(Ω)", "\\L\\1\\2"), "ασω");
+    assert.equal(substitute("ΟΔΟΣ", ".+", "\\L&"), "οδος");
+    assert.equal(substitute("ΟΔΟΣ ΑΣ", "(\\S+) (\\S+)", "\\L\\1-\\2\\E!"), "οδος-ας!");
+    assert.equal(substitute("ab cd", "(\\w+) (\\w+)", "\\U\\1\\l\\2\\E"), "ABcD");
+  });
+
   it("puts in a line break of the kind that the note has", () => {
     assert.equal(substitute("a, b\nc", ", ", "\\n"), "a\nb\nc");
     assert.equal(substitute("a, b\r\nc, d", ", ", "\\n"), "a\r\nb\r\nc\r\nd");
@@ -165,6 +173,13 @@ describe("replaceAll with a regular expression", () => {
     assert.deepEqual(replaceAll("abc", regex("x*"), template("-")), { text: "-a-b-c-", count: 4 });
     assert.equal(substitute("aab", "a*", "-"), "--b-");
     assert.equal(substitute("📝", "x*", "-"), "-📝-");
+  });
+
+  it("leaves no half of an emoji in the text", () => {
+    assert.equal(substitute("hi📝", "\\B", " "), "h i📝 ");
+    assert.equal(substitute("#📝", "\\#.", "X"), "X");
+    assert.equal(substitute("e📝 ex", "\\e.", "X"), "e📝 X");
+    assert.equal(countMatches("x📝y", regex("\\B")), 0);
   });
 
   it("keeps the lines without a match as they are", () => {
@@ -236,6 +251,10 @@ describe("replaceInLine", () => {
   it("replaces nothing in a line after the end of the text", () => {
     assert.equal(replaceInLine(text, 3, "fox", plain("fox"), literal("cat")), null);
     assert.equal(replaceInLine(text, 9, "", plain("fox"), literal("cat")), null);
+    // As in Vim, a line break at the end starts no line: an empty line that was there is gone
+    assert.equal(replaceInLine("a\n", 1, "", regex("^$"), template("empty")), null);
+    assert.equal(replaceInLine("a\r\n", 1, "", regex("^$"), template("empty")), null);
+    assert.deepEqual(replaceInLine("a\n\n", 1, "", regex("^$"), template("empty")), { text: "a\nempty\n", count: 1 });
   });
 });
 
@@ -290,5 +309,16 @@ describe("toPieces", () => {
   it("leaves a line without a match as it is", () => {
     assert.deepEqual(toPieces("plain", []), [{ text: "plain", kind: "same" }]);
     assert.deepEqual(toPieces("", []), []);
+  });
+});
+
+describe("swapsOf with a span", () => {
+  it("has the replacements of the matches within the span of the first one", () => {
+    const line = `${"=".repeat(1000)}a1 b2 c3 d4`;
+    assert.deepEqual(swapsOf(line, regex("(\\w)(\\d)"), template("\\2\\1"), "\n", 4), [
+      { start: 1000, end: 1002, text: "1a" },
+      { start: 1003, end: 1005, text: "2b" },
+    ]);
+    assert.equal(swapsOf(line, regex("(\\w)(\\d)"), template("\\2\\1"), "\n").length, 4);
   });
 });

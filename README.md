@@ -139,13 +139,14 @@ While you replace, each result shows its line as it will be: the text that is fo
 - **All notes.** `Mod+Alt+Enter` or **Replace all** replaces the text in every note that has it, also in the lines that are not listed. First the dialog asks, and says how many places in how many notes will change. `Enter` replaces, and `Esc` goes back.
 - **Undo.** After a replacement, a notice says what changed, and its **Undo** button puts the notes back. A note that was changed again since then is left as it is. The notice stays for 10 seconds.
 
-What is replaced is what the search finds, as the switches say. The replacement goes in exactly as you typed it, and an empty replacement removes the text. Notes that the exclude input hides are not changed.
+What is replaced is what the search finds, as the switches say. With the regular expression switch off, the replacement goes in exactly as you typed it. An empty replacement removes the text. Notes that the exclude input hides are not changed.
 
 - In the replacement input, `Enter` replaces in the selected line as well. In the query, it opens the selected line.
 - A note is changed from the text it has at that moment. When a line is no longer what the dialog read, nothing is replaced in it, and the results show the note as it is now.
 - What you typed in an open note and is not saved yet is saved first, so it is replaced as well.
 - A note that was deleted or renamed since the dialog read it, or that cannot be written, is left as it is, and a notice names it.
-- Obsidian takes a moment to write each note. While it writes many, the row under the query counts them, as in `Replacing: 640 of 2000 notes`.
+- A note that starts with a byte order mark, as Notepad on Windows can write, keeps it at the start.
+- Obsidian takes a moment to write each note. While it writes many, the numbers at the right of the exclude input count them, as in `Replacing: 640 of 2000 notes`. Before Replace all asks, they say `Counting...` while many matches are counted, and `Enter` does nothing until the question is there.
 
 ### Replacing with a regular expression
 
@@ -165,7 +166,7 @@ With the regular expression switch on, the replacement can bring in what each ma
 
 The query `(\w+)@(\w+)\.com` with the replacement `\U\2\E: \1` makes `anna@example.com` into `EXAMPLE: anna`.
 
-- A group that the query does not have puts in nothing after a backslash. After `$` it stays as you typed it, as in JavaScript.
+- A group that the query does not have puts in nothing after a backslash. After `$`, as in `$5` or `$<name>`, it stays as you typed it.
 - `$12` is group 12 when the query has twelve groups, and otherwise group 1 followed by `2`.
 - A line break that the replacement puts in shows as `↵` in the results.
 - A note that changed after the search, as by a sync, is left as it is, and a notice names it: on a new line the regular expression could take too long. The results then show the note as it is now.

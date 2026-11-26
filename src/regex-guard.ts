@@ -66,10 +66,10 @@ export class RegexGuard {
   /** True once the worker failed. Regular expressions are not checked from then on. */
   private isUnavailable = false;
   /** The version of the text of each note that the worker has */
-  private readonly sent = new Map<string, number>();
+  private readonly sentVersions = new Map<string, number>();
   /** The regular expression whose notes are checked, and the version of the text of each note that was checked */
   private key = "";
-  private readonly checked = new Map<string, number>();
+  private readonly checkedVersions = new Map<string, number>();
   private lastId = 0;
   private pending: Pending | null = null;
   /** When the worker was last heard from, and of which check */
@@ -95,7 +95,7 @@ export class RegexGuard {
       return (
         this.isUnavailable ||
         version === undefined ||
-        (this.key === key && this.checked.get(path) === version)
+        (this.key === key && this.checkedVersions.get(path) === version)
       );
     };
   }
@@ -112,7 +112,7 @@ export class RegexGuard {
     const key = keyOf(query);
     if (key !== this.key) {
       this.key = key;
-      this.checked.clear();
+      this.checkedVersions.clear();
     }
     const isChecked = this.checkedFor(query);
     const todo = paths.filter((path) => !isChecked(path));
@@ -173,9 +173,9 @@ export class RegexGuard {
     paths.forEach((path, i) => {
       const text = this.index.get(path);
       const version = pending.versions[pending.sentFrom + i];
-      if (text !== undefined && this.sent.get(path) !== version) {
+      if (text !== undefined && this.sentVersions.get(path) !== version) {
         texts.push([path, text]);
-        this.sent.set(path, version);
+        this.sentVersions.set(path, version);
         length += text.length;
       }
     });
@@ -227,7 +227,7 @@ export class RegexGuard {
   private stopWorker(): void {
     this.worker?.terminate();
     this.worker = null;
-    this.sent.clear();
+    this.sentVersions.clear();
     this.unread = 0;
     this.heardId = 0;
   }
@@ -252,7 +252,7 @@ export class RegexGuard {
     const upTo = message.kind === "done" ? pending.paths.length : pending.sentFrom + message.checked;
     const hasProgress = upTo > pending.checked;
     for (let i = pending.checked; i < upTo; i++) {
-      this.checked.set(pending.paths[i], pending.versions[i]);
+      this.checkedVersions.set(pending.paths[i], pending.versions[i]);
     }
     pending.checked = Math.max(pending.checked, upTo);
     if (message.kind === "done") {

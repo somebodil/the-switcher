@@ -2,8 +2,8 @@
 // the dialog does. A pattern that takes too long holds up the worker, and not
 // Obsidian. esbuild.config.mjs builds it by itself, and the guard starts it
 // from the text of its code.
-import { forEachLine } from "./search/lines.ts";
 import { Matcher, type TextQuery } from "./search/matcher.ts";
+import { takesTooLong } from "./search/slow-note.ts";
 
 /** The texts of notes, for the worker to keep */
 export interface TextsMessage {
@@ -85,19 +85,13 @@ async function check({ id, query, paths, everyNote }: CheckMessage): Promise<voi
     }
     const text = texts.get(paths[i]);
     if (text !== undefined) {
-      const start = performance.now();
-      let isSlow = false;
+      let isSlow: boolean;
       try {
-        forEachLine(text, (_start, line) => {
-          // All the matches, as the list, the preview and a replacement look for them
-          matcher.execAll(line);
-          const now = performance.now();
-          isSlow = now - start > SLOW_NOTE_MS;
+        isSlow = takesTooLong(text, matcher, SLOW_NOTE_MS, () => performance.now(), (now) => {
           if (now - beatAt >= BEAT_MS) {
             tell({ kind: "beat", id, checked: i });
             beatAt = now;
           }
-          return !isSlow;
         });
       } catch (error: unknown) {
         tell({ kind: "failed", id, checked: i, reason: reasonOf(error) });

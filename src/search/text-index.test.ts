@@ -45,22 +45,19 @@ describe("TextIndex.search", () => {
           path: "a.md",
           line: 2,
           text: "The quick brown fox.",
-          ranges: [{ start: 16, end: 19 }],
+          first: { start: 16, end: 19 },
         },
         {
           path: "a.md",
           line: 4,
           text: "fox and FOX again",
-          ranges: [
-            { start: 0, end: 3 },
-            { start: 8, end: 11 },
-          ],
+          first: { start: 0, end: 3 },
         },
         {
           path: "b.md",
           line: 1,
           text: "A Fox on line two",
-          ranges: [{ start: 2, end: 5 }],
+          first: { start: 2, end: 5 },
         },
       ],
     });
@@ -148,8 +145,8 @@ describe("TextIndex.search", () => {
   it("knows the line after a character that grows in lower case", () => {
     const index = indexOf({ "a.md": "İİİ\nİ fox İ\nfox" });
     assert.deepEqual(find(index, "fox", ["a.md"], 10).matches, [
-      { path: "a.md", line: 1, text: "İ fox İ", ranges: [{ start: 2, end: 5 }] },
-      { path: "a.md", line: 2, text: "fox", ranges: [{ start: 0, end: 3 }] },
+      { path: "a.md", line: 1, text: "İ fox İ", first: { start: 2, end: 5 } },
+      { path: "a.md", line: 2, text: "fox", first: { start: 0, end: 3 } },
     ]);
   });
 
@@ -160,7 +157,7 @@ describe("TextIndex.search", () => {
         path: "k.md",
         line: 1,
         text: "11월 예산 정산을 마쳤다.",
-        ranges: [{ start: 4, end: 9 }],
+        first: { start: 4, end: 9 },
       },
     ]);
   });
@@ -402,6 +399,14 @@ describe("toSnippet", () => {
       ranges: [],
     });
   });
+
+  it("has no ellipsis at the start when the cut moves back to it, not to split an emoji", () => {
+    const line = `📝${"a".repeat(39)}fox`;
+    assert.deepEqual(toSnippet(line, [{ start: 41, end: 44 }], 80), {
+      text: line,
+      ranges: [{ start: 41, end: 44 }],
+    });
+  });
 });
 
 describe("TextIndex.searchOn", () => {
@@ -535,8 +540,7 @@ describe("TextIndex.search with a regular expression", () => {
           assert.equal(search.total, expected.total, label);
           assert.deepEqual(search.found, expected.found, label);
           for (const match of search.matches) {
-            assert.deepEqual(match.ranges, matcher.findAll(match.text), label);
-            assert.ok(match.ranges.length > 0, label);
+            assert.deepEqual(match.first, matcher.findAll(match.text)[0], label);
           }
         }
       }

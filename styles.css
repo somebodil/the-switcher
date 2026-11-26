@@ -139,16 +139,23 @@ body:not(.is-mobile) .the-switcher.prompt {
   cursor: nwse-resize;
 }
 
-/* The row between the query and the results: what to exclude, and how many results are listed */
-.the-switcher-status {
+/*
+ * The rows between the query and the results: the replacement while
+ * replacing, and under it what to exclude, with how many results are listed
+ */
+.the-switcher-status,
+.the-switcher-replace {
   display: flex;
   align-items: center;
   gap: var(--size-4-2);
   padding: var(--size-2-2) var(--size-4-4);
   border-top: 1px solid var(--background-modifier-border);
-  border-bottom: 1px solid var(--background-modifier-border);
   background-color: var(--the-switcher-bar);
   color: var(--text-muted);
+}
+
+.the-switcher-status {
+  border-bottom: 1px solid var(--background-modifier-border);
 }
 
 /* On a phone that has the query under the results, this row is right above the query */
@@ -208,18 +215,9 @@ body:not(.is-mobile) .the-switcher.prompt {
   color: var(--text-error);
 }
 
-/*
- * The row with the replacement, between the query and the exclude input. It
- * is there while replacing, and looks like the row under it.
- */
+/* The row with the replacement is there only while replacing */
 .the-switcher-replace {
   display: none;
-  align-items: center;
-  gap: var(--size-4-2);
-  padding: var(--size-2-2) var(--size-4-4);
-  border-top: 1px solid var(--background-modifier-border);
-  background-color: var(--the-switcher-bar);
-  color: var(--text-muted);
 }
 
 .the-switcher.mod-replace .the-switcher-replace {

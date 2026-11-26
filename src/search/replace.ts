@@ -133,19 +133,21 @@ function dollarText(found: RegExpExecArray, digits: string): string {
 export class Replacement {
   readonly typed: string;
   readonly isTemplate: boolean;
-  /** What the replacement is made of, or null when it is the same for every match */
-  private readonly tokens: Token[] | null;
-  private readonly constant: string;
+  /** What the replacement is made of */
+  private readonly tokens: Token[];
+  /**
+   * The text of every match when the replacement brings in nothing of the
+   * match, as for a plain query, or null. A replacement of many matches
+   * is then quicker.
+   */
+  private readonly constant: string | null;
 
   constructor(typed: string, isTemplate: boolean) {
     this.typed = typed;
     this.isTemplate = isTemplate;
-    const tokens: Token[] = isTemplate ? parse(typed) : [{ kind: "text", text: typed }];
-    const isConstant = tokens.every((token) => token.kind === "text");
-    this.tokens = isConstant ? null : tokens;
-    this.constant = isConstant
-      ? tokens.map((token) => (token.kind === "text" ? token.text : "")).join("")
-      : "";
+    this.tokens = isTemplate ? parse(typed) : [{ kind: "text", text: typed }];
+    const [only, ...rest] = this.tokens;
+    this.constant = only === undefined ? "" : only.kind === "text" && rest.length === 0 ? only.text : null;
   }
 
   /**
@@ -154,25 +156,38 @@ export class Replacement {
    * @param lineBreak the line break of the note
    */
   textFor(found: RegExpExecArray, lineBreak: string): string {
-    if (this.tokens === null) {
+    if (this.constant !== null) {
       return this.constant;
     }
     let text = "";
     let following: "U" | "L" | null = null;
     let next: "u" | "l" | null = null;
+    // What \U or \L changes. It is changed as a whole, as a word is: a Greek
+    // sigma in lower case is final only at the end of the word.
+    let run = "";
+    const endRun = (): void => {
+      if (run !== "") {
+        text += following === "U" ? run.toUpperCase() : run.toLowerCase();
+        run = "";
+      }
+    };
     const add = (part: string | undefined): void => {
       if (part === undefined || part === "") {
         return;
       }
       let rest = part;
       if (next !== null) {
+        endRun();
         const first = String.fromCodePoint(rest.codePointAt(0) ?? 0);
         text += next === "u" ? first.toUpperCase() : first.toLowerCase();
         rest = rest.slice(first.length);
         next = null;
       }
-      text +=
-        following === "U" ? rest.toUpperCase() : following === "L" ? rest.toLowerCase() : rest;
+      if (following === null) {
+        text += rest;
+      } else {
+        run += rest;
+      }
     };
     const groups = found.length - 1;
     for (const token of this.tokens) {
@@ -196,11 +211,13 @@ export class Replacement {
           if (token.change === "u" || token.change === "l") {
             next = token.change;
           } else {
+            endRun();
             following = token.change === "E" ? null : token.change;
           }
           break;
       }
     }
+    endRun();
     return text;
   }
 }
@@ -209,14 +226,16 @@ export class Replacement {
  * Finds the matches in a line, with what takes the place of each.
  *
  * @param lineBreak the line break of the note
+ * @param span how far after the start of the first match to look. Left out, every match is found.
  */
 export function swapsOf(
   line: string,
   matcher: Matcher,
   replacement: Replacement,
   lineBreak: string,
+  span = Infinity,
 ): Swap[] {
-  return matcher.execAll(line).map((found) => ({
+  return matcher.execAll(line, span).map((found) => ({
     start: found.index,
     end: found.index + found[0].length,
     text: replacement.textFor(found, lineBreak),
@@ -286,7 +305,8 @@ export function replaceInLine(
   let start = 0;
   for (let number = 0; number < line; number++) {
     const lineBreak = text.indexOf("\n", start);
-    if (lineBreak === -1) {
+    if (lineBreak === -1 || lineBreak === text.length - 1) {
+      // As in Vim, a line break at the end of the text starts no line
       return null;
     }
     start = lineBreak + 1;

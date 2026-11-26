@@ -1,10 +1,9 @@
 import { type App, type Instruction, Notice, Platform, setIcon } from "obsidian";
 import type { ChangeResult, NoteChange, NoteTexts, OnChangeProgress } from "../note-texts.ts";
 import { FileIndex } from "../search/file-index.ts";
-import { type Range, toSegments } from "../search/highlight.ts";
-import { Matcher, sameQuery, type TextQuery } from "../search/matcher.ts";
+import { toSegments } from "../search/highlight.ts";
+import type { Matcher, TextQuery } from "../search/matcher.ts";
 import {
-  countMatches,
   type Piece,
   replaceAll,
   Replacement,
@@ -12,6 +11,7 @@ import {
   swapsOf,
   toPieces,
 } from "../search/replace.ts";
+import { type Counted, type Problem, SearchRunner } from "../search/search-runner.ts";
 import { type LineMatch, type TextSearch, toSnippet } from "../search/text-index.ts";
 import { ConfirmModal } from "./confirm-modal.ts";
 import { makeDraggable } from "./drag.ts";
@@ -36,19 +36,6 @@ const PREVIEW_LINE_LENGTH = 1000;
 const QUESTION_TEXT_LENGTH = 80;
 /** How many names of notes a notice gives before it only counts the rest */
 const NAMES_IN_NOTICE = 3;
-/**
- * How many milliseconds a search goes on before it makes room for a keystroke
- * and for the dialog to be painted
- */
-const SEARCH_PART_MS = 10;
-/** After how many notes a search looks at the clock. Looking takes time as well. */
-const NOTES_PER_LOOK_AT_CLOCK = 8;
-/**
- * How many milliseconds pass at least before a list that is not full yet is
- * filled again with what was found since. Filling it takes longer than a part
- * of the search, so doing it after every part would hold the search up.
- */
-const LIST_AGAIN_MS = 100;
 /** How long the notice that tells of a replacement, and can undo it, stays */
 const UNDO_NOTICE_MS = 10_000;
 
@@ -56,10 +43,7 @@ const UNDO_NOTICE_MS = 10_000;
 const NO_ALIASES: string[] = [];
 
 /** How the query is taken. The plugin keeps the switches as they were left until Obsidian is closed. */
-export interface SearchSwitches {
-  regex: boolean;
-  matchCase: boolean;
-}
+export type SearchSwitches = Pick<TextQuery, "regex" | "matchCase">;
 
 export interface TextDialogOptions extends DialogOptions {
   /** True to open the dialog with the input for the replacement */
@@ -85,9 +69,9 @@ export class TextModal extends SwitcherModal<LineMatch> {
   /** Which result each element of the list shows, to preview the selected one */
   private readonly resultOf = new WeakMap<Element, LineMatch>();
   private readonly selectionObserver: MutationObserver;
+  /** The search for the query */
+  private readonly runner: SearchRunner;
 
-  /** The paths to look in, in the order of the results */
-  private paths: string[] = [];
   /** True while the row with the replacement is shown */
   private replacing: boolean;
   /** The replacement as it was read last */
@@ -97,26 +81,11 @@ export class TextModal extends SwitcherModal<LineMatch> {
   /** The result that the preview shows, or undefined when the preview is to be drawn anew */
   private previewed: LineMatch | null | undefined = null;
   private isReading = true;
-
-  /** The search for the query, which may still be going on. Null for a query that is not valid or takes too long. */
-  private search: TextSearch | null = null;
   /**
-   * Resolves once the guard tried the regular expression of the search on all
-   * of its notes: true if the search can go on to its end
+   * True while the dialog gets ready to ask whether to replace all: the
+   * search goes on to its end, and the matches are counted
    */
-  private searchChecked: Promise<boolean> = Promise.resolve(true);
-  /** The search whose regular expression the guard is trying on the notes */
-  private checking: TextSearch | null = null;
-  /** A query that the dialog gave up on, and why. It is not tried again until it changes. */
-  private givenUp: { query: TextQuery; problem: string } | null = null;
-  /** True while the dialog waits for the search to end, to ask whether to replace all */
   private isAsking = false;
-  /** How many matches of the search the list has, and when it got them */
-  private listed = 0;
-  private listedAt = 0;
-  /** Calls for the next part of a search, after whatever else is waiting */
-  private readonly nextPart = new MessageChannel();
-  private isNextPartCalled = false;
 
   constructor(app: App, texts: NoteTexts, options: TextDialogOptions) {
     super(app, {
@@ -129,6 +98,15 @@ export class TextModal extends SwitcherModal<LineMatch> {
     this.switches = options.switches;
     this.replacing = options.replacing;
     this.modalEl.toggleClass("mod-replace", this.replacing);
+    this.runner = new SearchRunner(
+      texts.index,
+      texts.guard,
+      {
+        listAgain: () => this.listAgain(),
+        showTotal: (listed, total) => this.setStatus(`${listed} / ${total}`),
+      },
+      MAX_RESULTS,
+    );
 
     const { vault, workspace } = this.app;
     this.notes = new FileIndex(
@@ -165,7 +143,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
       type: "text",
       attr: { spellcheck: "false", autocapitalize: "off" },
     });
-    this.replaceInputEl.addEventListener("input", () => this.redraw());
+    this.replaceInputEl.addEventListener("input", () => this.redrawLines());
     this.addReplaceButton(replaceEl, "Replace", `Replace in the selected line (${ALT_KEY} ↵)`, () => {
       void this.replaceSelected();
     });
@@ -194,11 +172,6 @@ export class TextModal extends SwitcherModal<LineMatch> {
       },
     });
     this.previewEl = bodyEl.createDiv({ cls: "the-switcher-preview" });
-
-    this.nextPart.port1.onmessage = () => {
-      this.isNextPartCalled = false;
-      this.searchOn();
-    };
 
     // The selection moves with the arrow keys and the mouse. The list marks it
     // with a class, so watching the classes tells when to change the preview.
@@ -229,10 +202,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
   override onClose(): void {
     super.onClose();
     this.selectionObserver.disconnect();
-    this.search = null;
-    this.nextPart.port1.close();
-    // The worker lets go of its copy of the texts
-    this.texts.guard.stop();
+    this.runner.stop();
   }
 
   protected override instructions(): Instruction[] {
@@ -255,9 +225,9 @@ export class TextModal extends SwitcherModal<LineMatch> {
 
   /** Enter in the replacement replaces in the selected line, and elsewhere opens the selected result. */
   protected override onEnter(evt: KeyboardEvent): void {
-    // Neither an Enter that is held down nor one during a replacement, as after the
-    // one that said to replace all, opens a result by mistake
-    if (evt.repeat || this.isChanging()) {
+    // Neither an Enter that is held down nor one that is meant for the question of
+    // Replace all, or comes during a replacement, opens a result by mistake
+    if (evt.repeat || this.isChanging() || this.isAsking) {
       return;
     }
     if (this.replacing && activeDocument.activeElement === this.replaceInputEl) {
@@ -269,40 +239,16 @@ export class TextModal extends SwitcherModal<LineMatch> {
 
   getSuggestions(text: string): LineMatch[] {
     if (this.isReading) {
-      this.emptyStateText = "Reading the notes...";
-      this.setStatus("");
-      this.updateReplaceButtons(0);
-      return [];
+      return this.showNothing("Reading the notes...");
     }
-    const query: TextQuery = { text, ...this.switches };
-    if (this.givenUp !== null && !sameQuery(this.givenUp.query, query)) {
-      this.givenUp = null;
+    // The search goes on by itself, and lists again when it found more
+    const results = this.runner.resultsFor({ text, ...this.switches });
+    if ("problem" in results) {
+      this.inputEl.addClass("is-invalid");
+      return this.showNothing(describe(results.problem));
     }
-    if (this.givenUp !== null) {
-      return this.showProblem(this.givenUp.problem);
-    }
-    // The search itself asks for its results to be listed again when it finds more
-    let { search } = this;
-    if (search === null || !sameQuery(search.query, query)) {
-      let matcher: Matcher;
-      try {
-        matcher = new Matcher(query);
-      } catch (error: unknown) {
-        this.search = null;
-        return this.showProblem(`Not a valid regular expression: ${reasonOf(error)}`);
-      }
-      this.inputEl.removeClass("is-invalid");
-      // A search that is dropped when the notes or the paths to look in change, so what it found still holds
-      search = this.texts.index.searchOn(search, matcher, this.paths, MAX_RESULTS);
-      this.startSearch(search);
-      if (this.search !== search) {
-        // The regular expression failed at once
-        return this.getSuggestions(text);
-      }
-    }
-    const { matches, total, done, matcher } = search;
-    this.listed = matches.length;
-    this.listedAt = performance.now();
+    this.inputEl.removeClass("is-invalid");
+    const { matches, total, done, matcher } = results.search;
     if (!done) {
       this.emptyStateText = "Searching...";
     } else if (matcher.isEmpty) {
@@ -316,10 +262,9 @@ export class TextModal extends SwitcherModal<LineMatch> {
     return matches.slice();
   }
 
-  /** Shows what is wrong with the query, instead of results. */
-  private showProblem(problem: string): LineMatch[] {
-    this.inputEl.addClass("is-invalid");
-    this.emptyStateText = problem;
+  /** Shows a text instead of results, as what is wrong with the query. */
+  private showNothing(text: string): LineMatch[] {
+    this.emptyStateText = text;
     this.setStatus("");
     this.updateReplaceButtons(0);
     return [];
@@ -334,7 +279,6 @@ export class TextModal extends SwitcherModal<LineMatch> {
       contentEl.createDiv({ cls: "suggestion-title the-switcher-line" }),
       match.text,
       false,
-      match.ranges,
     );
 
     const auxEl = el.createDiv({ cls: "suggestion-aux" });
@@ -352,166 +296,26 @@ export class TextModal extends SwitcherModal<LineMatch> {
 
   protected onExcludeChange(): void {
     this.notes.exclude(this.excludePatterns);
-    this.paths = this.notes.search([]).map((hit) => hit.entry.file.path);
-    this.search = null;
-    // The note where the regular expression took too long may be left out now
-    this.givenUp = null;
+    this.runner.lookIn(this.notes.search([]).map((hit) => hit.entry.file.path));
   }
 
   protected openResult(match: LineMatch, target: Target): Promise<void> {
     return this.openFile(match.path, target, {
       line: match.line,
-      range: match.ranges[0],
+      range: match.first,
     });
   }
 
   private async readNotes(): Promise<void> {
     try {
-      await this.texts.refresh(this.app);
+      await this.texts.refresh();
     } catch (error: unknown) {
       console.error("the-switcher: failed to read the notes", error);
     }
     this.isReading = false;
-    this.search = null;
-    this.refresh();
-  }
-
-  /**
-   * Does a part of a search. A search of many notes takes longer than a
-   * keystroke may wait, so it stops after a moment and goes on after whatever
-   * came up in the meantime. A keystroke that changes the query drops it.
-   *
-   * @returns false if the search was given up. The caller lists again.
-   */
-  private searchPart(search: TextSearch): boolean {
-    const end = performance.now() + SEARCH_PART_MS;
-    let notes = 0;
-    if (!this.runSearch(search, () => ++notes % NOTES_PER_LOOK_AT_CLOCK === 0 && performance.now() >= end)) {
-      return false;
-    }
-    if (search.isWaiting && this.checking !== search && this.search === search) {
-      // A note changed since the guard tried the regular expression on it,
-      // as when a replacement is undone from its notice
-      this.startCheck(search);
-    }
-    // A search that waits for the guard goes on when the guard is done with more notes
-    if (!search.done && !search.isWaiting && !this.isNextPartCalled) {
-      this.isNextPartCalled = true;
-      this.nextPart.port2.postMessage(null);
-    }
-    return true;
-  }
-
-  /**
-   * Runs a search, until it is time for a pause if that is told. A regular
-   * expression can fail on a line that is too long for it, which the guard
-   * finds out first unless there is no worker. Then the dialog gives up on it.
-   *
-   * @returns false if the search was given up. The caller lists again.
-   */
-  private runSearch(search: TextSearch, isTimeForPause?: () => boolean): boolean {
-    try {
-      search.run(isTimeForPause, this.isReady(search));
-      return true;
-    } catch (error: unknown) {
-      this.giveUp(search.query, `The regular expression cannot be matched: ${reasonOf(error)}`);
-      return false;
-    }
-  }
-
-  /** Stops searching for a query, to say why instead of showing results. The caller lists again. */
-  private giveUp(query: TextQuery, problem: string): void {
-    this.givenUp = { query, problem };
-    this.search = null;
-    this.checking = null;
-  }
-
-  /** Which notes a search may look at: for a regular expression, the ones the guard tried it on. Undefined for all. */
-  private isReady(search: TextSearch): ((path: string) => boolean) | undefined {
-    return search.query.regex ? this.texts.guard.checkedFor(search.query) : undefined;
-  }
-
-  /**
-   * Makes a search the one of the dialog, and starts it. A regular expression
-   * is tried by the guard first, and the search looks only at the notes that
-   * the guard is done with.
-   */
-  private startSearch(search: TextSearch): void {
-    this.search = search;
-    this.startCheck(search);
-    this.searchPart(search);
-  }
-
-  /** Has the guard try the regular expression of a search on its notes, and goes on with the search as it does. */
-  private startCheck(search: TextSearch): void {
-    const onProgress = (): void => {
-      if (this.search === search) {
-        this.searchOn();
-      }
-    };
-    this.checking = search;
-    this.searchChecked = this.check(search, onProgress).then((isChecked) => {
-      if (this.checking === search) {
-        this.checking = null;
-      }
-      if (isChecked) {
-        onProgress();
-      }
-      return isChecked;
-    });
-  }
-
-  /**
-   * Has the guard try the regular expression of a search on its notes, where
-   * it was not tried yet. When it takes too long or fails, the dialog says so.
-   *
-   * @param onProgress called when the guard is done with more of the notes
-   * @returns true once the guard is done with all of the notes, and false if
-   *   the search is to be given up: the regular expression takes too long or
-   *   fails, or another search took its place
-   */
-  private async check(search: TextSearch, onProgress: () => void): Promise<boolean> {
-    const { query } = search;
-    if (!query.regex || search.done) {
-      return true;
-    }
-    const result = await this.texts.guard.check(query, search.paths, onProgress);
-    const isCurrent = this.search !== null && sameQuery(this.search.query, query);
-    if (isCurrent && result.kind === "slow") {
-      this.giveUp(
-        query,
-        `The regular expression takes too long in “${toBasename(result.path)}”. ` +
-          "A repeat inside a repeat, as in (\\w+\\s?)+, can try a vast number of ways to match.",
-      );
-      this.listAgain();
-    } else if (isCurrent && result.kind === "failed") {
-      this.giveUp(query, `The regular expression cannot be matched in “${toBasename(result.path)}”: ${result.reason}`);
-      this.listAgain();
-    }
-    return result.kind === "fast";
-  }
-
-  /** Goes on with the search, and shows what it found. */
-  private searchOn(): void {
-    const { search } = this;
-    if (!search || search.done) {
-      return;
-    }
-    if (!this.searchPart(search)) {
-      this.listAgain();
-      return;
-    }
-
-    const hasMore = search.matches.length > this.listed;
-    const isTimeToList =
-      search.done ||
-      search.matches.length >= MAX_RESULTS ||
-      performance.now() - this.listedAt >= LIST_AGAIN_MS;
-    if ((hasMore && isTimeToList) || (search.done && this.listed === 0)) {
-      this.listAgain();
-    } else if (search.done) {
-      // The list has all it gets. Now the lines are counted as well.
-      this.setStatus(`${this.listed} / ${search.total}`);
+    // A dialog that was closed meanwhile starts no search, which would leave the texts with the worker
+    if (this.containerEl.isConnected) {
+      this.refresh();
     }
   }
 
@@ -539,10 +343,28 @@ export class TextModal extends SwitcherModal<LineMatch> {
     listEl.scrollTop = scrollTop;
   }
 
-  /** Shows the results and the preview again, as when the replacement, the mode or a switch changes. */
+  /** Shows the results and the preview again, as when a switch changes. */
   private redraw(): void {
     this.previewed = undefined;
     this.listAgain();
+  }
+
+  /**
+   * Draws the lines of the results and of the preview again, for the results
+   * that are listed, as when the replacement or the mode changes. The list and
+   * the selection stay as they are.
+   */
+  private redrawLines(): void {
+    for (const el of Array.from(this.resultContainerEl.children)) {
+      const match = this.resultOf.get(el);
+      const lineEl = el.querySelector<HTMLElement>(".the-switcher-line");
+      if (match && lineEl) {
+        lineEl.empty();
+        this.appendLine(lineEl, match.text, false);
+      }
+    }
+    this.previewed = undefined;
+    this.updatePreview();
   }
 
   /** The place of the selected result in the list, or -1 if none is */
@@ -552,16 +374,10 @@ export class TextModal extends SwitcherModal<LineMatch> {
     );
   }
 
+  /** The result at a place in the list, or null if there is none */
   private matchAt(index: number): LineMatch | null {
     const el = this.resultContainerEl.children.item(index);
     return (el && this.resultOf.get(el)) ?? null;
-  }
-
-  private selectedMatch(): LineMatch | null {
-    const selectedEl = this.resultContainerEl.querySelector(
-      ".suggestion-item.is-selected",
-    );
-    return (selectedEl && this.resultOf.get(selectedEl)) ?? null;
   }
 
   private updatePreview(): void {
@@ -569,7 +385,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
       // A phone has no room for the preview, and no key that moves the selection
       return;
     }
-    const match = this.selectedMatch();
+    const match = this.matchAt(this.selectedIndex());
     if (match === this.previewed) {
       return;
     }
@@ -618,20 +434,22 @@ export class TextModal extends SwitcherModal<LineMatch> {
    *
    * @param isPreview true for a line of the preview, which keeps the
    *   indentation and more of a long line than a result does
-   * @param ranges where the matches are, if that is known
    */
-  private appendLine(el: HTMLElement, line: string, isPreview: boolean, ranges?: Range[]): void {
-    const matcher = this.search?.matcher;
+  private appendLine(el: HTMLElement, line: string, isPreview: boolean): void {
+    const matcher = this.runner.search?.matcher;
     const length = isPreview ? PREVIEW_LINE_LENGTH : SNIPPET_LENGTH;
+    // The matches past the part of a long line that is shown are not looked
+    // for: a line of an image pasted into a note can have tens of thousands
+    const span = 2 * length;
     if (!matcher) {
       el.appendText(toSnippet(line, [], length, isPreview).text);
     } else if (this.replacing) {
       // How a line break looks does not depend on its kind
-      const swaps = swapsOf(line, matcher, this.replacement(), "\n");
+      const swaps = swapsOf(line, matcher, this.replacement(), "\n", span);
       const snippet = toSnippet(line, swaps, length, isPreview);
       appendPieces(el, toPieces(snippet.text, snippet.ranges));
     } else {
-      const snippet = toSnippet(line, ranges ?? matcher.findAll(line), length, isPreview);
+      const snippet = toSnippet(line, matcher.findAll(line, span), length, isPreview);
       appendSegments(el, toSegments(snippet.text, snippet.ranges));
     }
   }
@@ -657,9 +475,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
       attr: { "aria-label": tooltip, role: "button" },
     });
     setIcon(switchEl, icon);
-    // The input that is typed in keeps the focus, and on a touch screen the keyboard stays
-    switchEl.addEventListener("mousedown", (evt) => evt.preventDefault());
-    switchEl.addEventListener("click", action);
+    onClickKeepingFocus(switchEl, action);
     return switchEl;
   }
 
@@ -695,9 +511,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
       text,
       attr: { "aria-label": tooltip },
     });
-    // The input that is typed in keeps the focus, and on a touch screen the keyboard stays
-    buttonEl.addEventListener("mousedown", (evt) => evt.preventDefault());
-    buttonEl.addEventListener("click", action);
+    onClickKeepingFocus(buttonEl, action);
     this.replaceButtonEls.push(buttonEl);
   }
 
@@ -717,35 +531,37 @@ export class TextModal extends SwitcherModal<LineMatch> {
     this.modalEl.toggleClass("mod-replace", this.replacing);
     this.showInstructions();
     (this.replacing ? this.replaceInputEl : this.inputEl).focus();
-    this.redraw();
+    this.redrawLines();
   }
 
   /** Replaces the matches in the selected line. */
   private async replaceSelected(): Promise<void> {
-    const match = this.selectedMatch();
-    const matcher = this.search?.matcher;
-    if (!this.replacing || this.isChanging() || !match || !matcher) {
+    const match = this.matchAt(this.selectedIndex());
+    const { search } = this.runner;
+    // Not while Replace all gets ready to ask: what it counted would not hold
+    if (!this.replacing || this.isChanging() || this.isAsking || !match || !search) {
       return;
     }
+    const { matcher } = search;
     const replacement = this.replacement();
     const counts = new Map<string, number>();
-    const stale = new Set<string>();
+    let isStale = false;
     const result = await this.changeNotes(
       "Replacing",
       () =>
-        this.texts.change(this.app, [match.path], (text, path) => {
+        this.texts.change([match.path], (text, path) => {
           const replaced = replaceInLine(text, match.line, match.text, matcher, replacement);
           if (replaced === null) {
-            stale.add(path);
+            isStale = true;
             return null;
           }
           counts.set(path, replaced.count);
           return replaced.text;
         }),
-      true,
+      search,
       match,
     );
-    if (stale.size > 0) {
+    if (isStale) {
       new Notice(`${toBasename(match.path)} was changed since it was read, and nothing was replaced. The results show it as it is now.`);
     }
     // A replacement that leaves the line as it was changes nothing, and the selection goes on to the next result
@@ -754,31 +570,34 @@ export class TextModal extends SwitcherModal<LineMatch> {
 
   /** Asks whether to replace the matches in all notes that have them, and does so if told to. */
   private async askToReplaceAll(): Promise<void> {
-    if (!this.replacing || this.isChanging() || this.isAsking || !this.search || this.search.matcher.isEmpty) {
+    const searched = this.runner.search;
+    if (!this.replacing || this.isChanging() || this.isAsking || !searched || searched.matcher.isEmpty) {
       return;
     }
-    // Every note has to be looked at to know what will be replaced
+    // Every note has to be looked at, and every match counted, to know what will be replaced
     this.isAsking = true;
     let search: TextSearch | null;
+    let counted: Counted | null = null;
     try {
-      search = await this.searchToTheEnd();
+      search = await this.runner.searchToTheEnd(() => this.isChanging());
+      if (search) {
+        this.setStatus("Counting...");
+        counted = await this.runner.count(search);
+      }
     } finally {
       this.isAsking = false;
     }
-    if (!search) {
+    // A change that started meanwhile, as an Undo from a notice, makes what was counted not hold
+    if (!search || !counted || this.isChanging()) {
       return;
     }
-    const { matcher } = search;
-    const paths = search.found.slice();
-    // The texts that the guard tried a regular expression on, and that are counted
-    const texts = new Map(paths.map((path) => [path, this.texts.index.get(path) ?? ""]));
-    let count = 0;
-    for (const text of texts.values()) {
-      count += countMatches(text, matcher);
-    }
+    this.setStatus(`${search.matches.length} / ${search.total}`);
+    const { texts, count } = counted;
     if (count === 0) {
       return;
     }
+    const { matcher } = search;
+    const paths = [...texts.keys()];
     const replacement = this.replacement();
     const matches = plural(count, "match", "matches");
     const { text, regex } = matcher.query;
@@ -792,48 +611,9 @@ export class TextModal extends SwitcherModal<LineMatch> {
           : `Replace ${matches} of ${what} with “${shorten(replacement.typed)}” in ${where}?`,
       action: "Replace all",
       onConfirm: () => {
-        void this.replaceAll(paths, matcher, replacement, matcher.query.regex ? texts : null);
+        void this.replaceInNotes(paths, matcher, replacement, regex ? texts : null);
       },
     }).open();
-  }
-
-  /**
-   * Runs the search of the dialog to its end. A regular expression is tried by
-   * the guard first on every note as the note is now: a note can have changed
-   * since, as when a replacement is undone from its notice.
-   *
-   * @returns the search, or null if it was given up or another took its place
-   */
-  private async searchToTheEnd(): Promise<TextSearch | null> {
-    let { search } = this;
-    let hasRun = false;
-    while (search !== null) {
-      if (!(await this.searchChecked) || this.search !== search || this.isChanging()) {
-        return null;
-      }
-      const isReady = this.isReady(search);
-      if (search.done && isReady !== undefined && !search.paths.every(isReady)) {
-        // What the search found may not hold any more
-        this.startSearch(this.texts.index.searchOn(null, search.matcher, this.paths, MAX_RESULTS));
-        search = this.search;
-      } else if (search.done) {
-        if (hasRun) {
-          this.listAgain();
-        }
-        return search;
-      } else if (this.runSearch(search)) {
-        hasRun = true;
-        if (search.isWaiting) {
-          // A note changed since the guard tried the regular expression on it
-          this.startCheck(search);
-        }
-      } else {
-        search = null;
-      }
-    }
-    // Given up: the list says why
-    this.listAgain();
-    return null;
   }
 
   /**
@@ -843,7 +623,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
    *   on. A note that has another text now, as after a sync, is left as it is:
    *   on a new line the regular expression could take too long.
    */
-  private async replaceAll(
+  private async replaceInNotes(
     paths: string[],
     matcher: Matcher,
     replacement: Replacement,
@@ -855,7 +635,6 @@ export class TextModal extends SwitcherModal<LineMatch> {
       "Replacing",
       (onProgress) =>
         this.texts.change(
-          this.app,
           paths,
           (text, path) => {
             if (checked !== null && text !== checked.get(path)) {
@@ -868,7 +647,7 @@ export class TextModal extends SwitcherModal<LineMatch> {
           },
           onProgress,
         ),
-      true,
+      this.runner.search,
     );
     if (changed.length > 0) {
       const one = changed.length === 1;
@@ -885,17 +664,17 @@ export class TextModal extends SwitcherModal<LineMatch> {
    *
    * @param action what the row under the query tells meanwhile, with how many
    *   of the notes are done. In a large vault it takes a while.
-   * @param narrow true if only the notes that the search found can have its query
-   *   afterwards. That holds for a replacement, which changes only those, while the query is the same.
+   * @param within the search whose notes are the only ones that can have its
+   *   query afterwards, or null. That holds for a replacement, which changes
+   *   only those, as long as the search is still the one of the dialog.
    * @param replaced the result that is replaced, if it is one result
    */
   private async changeNotes(
     action: string,
     change: (onProgress: OnChangeProgress) => Promise<ChangeResult>,
-    narrow: boolean,
+    within: TextSearch | null,
     replaced?: LineMatch,
   ): Promise<ChangeResult> {
-    const before = this.search;
     this.changing++;
     this.updateReplaceButtons(0);
     this.setStatus(`${action}...`);
@@ -907,46 +686,33 @@ export class TextModal extends SwitcherModal<LineMatch> {
       });
     } finally {
       try {
-        await this.searchAgain(narrow && this.search === before ? before : null, replaced);
+        await this.searchAgain(this.runner.search === within ? within : null, replaced);
       } finally {
         this.changing--;
-        this.updateReplaceButtons(this.search?.matches.length ?? 0);
+        this.updateReplaceButtons(this.runner.search?.matches.length ?? 0);
       }
     }
   }
 
   /**
-   * Searches anew, now that notes were changed.
+   * Searches anew, now that notes were changed, and lists the results with
+   * the selection where it was.
    *
    * @param within a search whose notes are the only ones that can have the query, or null to look at all of them
+   * @param replaced the result that was replaced, if it was one result
    */
   private async searchAgain(within: TextSearch | null, replaced?: LineMatch): Promise<void> {
-    const current = this.search;
     if (!this.containerEl.isConnected) {
       // Closed: the next dialog reads the notes as they are now
       return;
     }
-    if (!current) {
-      this.listAgain();
-      return;
-    }
-    const search = this.texts.index.searchOn(within, current.matcher, this.paths, MAX_RESULTS);
-    // The list stays as it is while the guard tries a regular expression on
-    // the changed notes, so that the selection can stay where it was
-    if (!(await this.check(search, () => undefined)) || this.search !== current) {
-      return;
-    }
-    this.search = search;
-    this.searchChecked = Promise.resolve(true);
     // Far enough for the selection to stay where it was, and for the result
     // after it, which is selected when the replaced one is still there
-    const enough = Math.min(this.selectedIndex() + 2, MAX_RESULTS);
-    if (!this.runSearch(search, () => search.matches.length >= enough) || !this.searchPart(search)) {
-      this.listAgain();
-      return;
+    const enough = (): number => Math.min(this.selectedIndex() + 2, MAX_RESULTS);
+    if (await this.runner.searchAgain(within, enough)) {
+      this.previewed = undefined;
+      this.listAgain(replaced);
     }
-    this.previewed = undefined;
-    this.listAgain(replaced);
   }
 
   /** Tells what was replaced, with a button that puts it back. */
@@ -982,8 +748,8 @@ export class TextModal extends SwitcherModal<LineMatch> {
     // What is put back can have the query in any of the notes
     const result = await this.changeNotes(
       "Putting back",
-      (onProgress) => this.texts.undo(this.app, changes, onProgress),
-      false,
+      (onProgress) => this.texts.undo(changes, onProgress),
+      null,
     );
     this.reportProblems(result, "put back");
     const kept = changes.length - result.changes.length - result.failed.length - result.missing.length;
@@ -1006,11 +772,30 @@ export class TextModal extends SwitcherModal<LineMatch> {
   }
 }
 
-/** What is wrong with a regular expression, as the error that the pattern gave tells it. */
-function reasonOf(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
-  // "Invalid regular expression: /(/giu: Unterminated group"
-  return message.slice(message.lastIndexOf(": ") + 1).trim();
+/** Tells why a query has no results. */
+function describe(problem: Problem): string {
+  switch (problem.kind) {
+    case "invalid":
+      return `Not a valid regular expression: ${problem.reason}`;
+    case "slow":
+      return (
+        `The regular expression takes too long in “${toBasename(problem.path)}”. ` +
+        "A repeat inside a repeat, as in (\\w+\\s?)+, can try a vast number of ways to match."
+      );
+    case "failed":
+      return problem.path === null
+        ? `The regular expression cannot be matched: ${problem.reason}`
+        : `The regular expression cannot be matched in “${toBasename(problem.path)}”: ${problem.reason}`;
+  }
+}
+
+/**
+ * Calls an action when an element is clicked, and leaves the focus where it
+ * is: in the input that is typed in, and on a touch screen with the keyboard up.
+ */
+function onClickKeepingFocus(el: HTMLElement, action: () => void): void {
+  el.addEventListener("mousedown", (evt) => evt.preventDefault());
+  el.addEventListener("click", action);
 }
 
 /** Adds a line as it is replaced: each match struck out, and the replacement after it. */

@@ -59,6 +59,22 @@ describe("Matcher with a plain query", () => {
     assert.deepEqual(findAll("Straße STRASSE", "straße"), [{ start: 0, end: 6 }]);
   });
 
+  it("finds a letter whatever its case as Unicode has it, as a regular expression does", () => {
+    // The final sigma is a sigma in lower case
+    assert.deepEqual(findAll("οδος", "ΟΔΟΣ"), [{ start: 0, end: 4 }]);
+    assert.deepEqual(findAll("ΟΔΟΣ", "οδος"), [{ start: 0, end: 4 }]);
+    // The Kelvin sign is a K
+    assert.deepEqual(findAll("\u212A", "k"), [{ start: 0, end: 1 }]);
+    assert.deepEqual(findAll("ẞ", "ß"), [{ start: 0, end: 1 }]);
+    assert.deepEqual(findAll("ß", "ẞ"), [{ start: 0, end: 1 }]);
+    // The dotless i is a letter of its own, either way
+    assert.deepEqual(findAll("I", "ı"), []);
+    assert.deepEqual(findAll("ı", "I"), []);
+    for (const [line, query] of [["οδος", "ΟΔΟΣ"], ["\u212A", "k"], ["I", "ı"], ["ı", "I"], ["ǅ", "ǆ"]] as const) {
+      assert.deepEqual(findAll(line, query), regex(query).findAll(line), `${query} in ${line}`);
+    }
+  });
+
   it("finds letters outside the basic plane whatever their case", () => {
     // Deseret: "𐐨" is the lower case of "𐐀"
     assert.deepEqual(findAll("𐐀 𐐨", "𐐨"), [
@@ -151,8 +167,8 @@ describe("Matcher with a regular expression", () => {
     }
   });
 
-  it("tells why a pattern is not valid as Unicode makes it", () => {
-    assert.throws(() => regex("(\\#"), /Invalid regular expression: \/\(\\#\/giu: /);
+  it("tells why a pattern is not valid as Unicode makes it, and not for a backslash too many", () => {
+    assert.throws(() => regex("(\\#"), /^SyntaxError: Invalid regular expression: \/.*\/giu: Unterminated group$/);
   });
 
   it("lets a backslash before a character that means nothing be, as without Unicode", () => {
@@ -160,6 +176,37 @@ describe("Matcher with a regular expression", () => {
     assert.deepEqual(regex("^\\- \\[ \\]").findAll("- [ ] task"), [{ start: 0, end: 5 }]);
     assert.deepEqual(regex("a{").findAll("a{b"), [{ start: 0, end: 2 }]);
     assert.deepEqual(regex("[\\w-.]+").findAll("a-b.c d"), [{ start: 0, end: 5 }, { start: 6, end: 7 }]);
+  });
+
+  it("stays Unicode aware with a backslash too many, or a brace that starts no repeat", () => {
+    // `.` is a whole emoji, and a property is a property
+    assert.deepEqual(regex("\\#.").findAll("#📝"), [{ start: 0, end: 3 }]);
+    assert.deepEqual(regex("\\#\\p{L}+").findAll("#tag #한글"), [{ start: 0, end: 4 }, { start: 5, end: 8 }]);
+    assert.deepEqual(regex("\\-\\s\\S").findAll("- 📝"), [{ start: 0, end: 4 }]);
+    assert.deepEqual(regex("\\#\\u{1F4DD}").findAll("#📝"), [{ start: 0, end: 3 }]);
+    assert.deepEqual(regex("\\\\#.").findAll("\\#📝"), [{ start: 0, end: 4 }]);
+    assert.deepEqual(regex("a{,5}").findAll("a{,5}"), [{ start: 0, end: 5 }]);
+    assert.deepEqual(regex("\\#x{2}}").findAll("#xx}"), [{ start: 0, end: 4 }]);
+    // A `-` next to a kind of character in a class is a `-`
+    assert.deepEqual(regex("[\\w-.]+ \\#.").findAll("a-b.c #📝"), [{ start: 0, end: 9 }]);
+  });
+
+  it("takes a pattern that is not valid with Unicode for another reason as without it", () => {
+    assert.deepEqual(regex("\\e").findAll("e"), [{ start: 0, end: 1 }]);
+    assert.deepEqual(regex("(?=a)*b").findAll("ab"), [{ start: 1, end: 2 }]);
+  });
+
+  it("finds no match that splits a character outside the basic plane", () => {
+    // V8 finds a match of nothing between the halves of an emoji for \B
+    assert.deepEqual(regex("\\B").findAll("x📝y"), []);
+    assert.equal(regex("\\B").test("x📝y"), false);
+    assert.equal(regex("\\B").first("x📝y"), null);
+    assert.deepEqual(regex("\\B").findAll("ab📝"), [{ start: 1, end: 1 }, { start: 4, end: 4 }]);
+    // Without Unicode, `.` matches half of an emoji
+    assert.deepEqual(regex("\\e.").findAll("e📝 ex"), [{ start: 4, end: 6 }]);
+    assert.equal(regex("\\e.").first("e📝"), null);
+    assert.equal(regex("\\e.").test("e📝"), false);
+    assert.equal(regex("\\e.").test("e📝 ex"), true);
   });
 
   it("stays Unicode aware for a pattern that is valid with Unicode", () => {
@@ -192,6 +239,48 @@ describe("Matcher with a regular expression", () => {
     ]);
     assert.deepEqual(matcher.findAll("foo"), matcher.findAll("foo"));
     assert.equal(matcher.test("foo"), true);
+  });
+});
+
+describe("Matcher with a span", () => {
+  it("finds the matches that start within the span of the first one, the first one included", () => {
+    const line = "ab ab ab ab";
+    assert.deepEqual(plain("ab").findAll(line, 0), [{ start: 0, end: 2 }]);
+    assert.deepEqual(plain("ab").findAll(line, 4), [{ start: 0, end: 2 }, { start: 3, end: 5 }]);
+    assert.deepEqual(plain("ab").findAll(line, 6), plain("ab").findAll(line, 4));
+    assert.deepEqual(plain("ab").findAll(line, 7), plain("ab").findAll(line).slice(0, 3));
+    assert.deepEqual(regex("b").findAll(`${"x".repeat(50)}b b b`, 3), [{ start: 50, end: 51 }, { start: 52, end: 53 }]);
+  });
+
+  it("counts the span from the first match, wherever it is", () => {
+    const line = `${"-".repeat(100_000)}needle needle`;
+    assert.deepEqual(plain("needle").findAll(line, 10), [{ start: 100_000, end: 100_006 }, { start: 100_007, end: 100_013 }]);
+  });
+
+  it("finds every match without a span, and with one wider than the line", () => {
+    const line = "a1 a2 a3";
+    assert.deepEqual(regex("a\\d").findAll(line, 1000), regex("a\\d").findAll(line));
+    assert.equal(regex("a\\d").findAll(line).length, 3);
+  });
+
+  it("goes on past matches of nothing, as without a span", () => {
+    assert.deepEqual(regex("x*").findAll("😀a😀", 4), [{ start: 0, end: 0 }, { start: 2, end: 2 }, { start: 3, end: 3 }]);
+  });
+
+  it("tells where the first match is", () => {
+    assert.deepEqual(plain("fox").first("a Fox, a fox"), { start: 2, end: 5 });
+    assert.deepEqual(regex("\\d+").first("x 12 345"), { start: 2, end: 4 });
+    assert.deepEqual(regex("^").first("abc"), { start: 0, end: 0 });
+    assert.equal(regex("z").first("abc"), null);
+    assert.equal(regex("").first("abc"), null);
+    assert.equal(plain(" ").first("a b"), null);
+  });
+
+  it("finds the same first match when asked again", () => {
+    const matcher = regex("o");
+    matcher.findAll("foo");
+    assert.deepEqual(matcher.first("foo"), { start: 1, end: 2 });
+    assert.deepEqual(matcher.first("foo"), { start: 1, end: 2 });
   });
 });
 

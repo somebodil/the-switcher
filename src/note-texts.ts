@@ -4,6 +4,18 @@ import { TextIndex } from "./search/text-index.ts";
 
 /** How many notes are read or written at the same time */
 const BATCH_SIZE = 64;
+/**
+ * The byte order mark that a note can start with, as one written by Notepad on
+ * Windows does. Obsidian reads a note without it, but writes what it is given.
+ */
+const BYTE_ORDER_MARK = "\uFEFF";
+
+/** Splits the byte order mark off the start of a text, if it has one. */
+function splitMark(text: string): [mark: string, rest: string] {
+  return text.startsWith(BYTE_ORDER_MARK)
+    ? [BYTE_ORDER_MARK, text.slice(BYTE_ORDER_MARK.length)]
+    : ["", text];
+}
 
 /** What a change did to a note: its text before and after. */
 export interface NoteChange {
@@ -59,14 +71,19 @@ export class NoteTexts {
   readonly index = new TextIndex();
   /** Tries a regular expression on the texts before a search does */
   readonly guard = new RegexGuard(this.index);
+  private readonly app: App;
   /** When each note was last modified at the time it was read */
   private readonly readAt = new Map<string, number>();
   /** The change that was asked for last. Changes are made one after another. */
   private lastChange: Promise<unknown> = Promise.resolve();
 
+  constructor(app: App) {
+    this.app = app;
+  }
+
   /** Brings the texts up to date with the vault, and with what is typed into open notes. */
-  async refresh(app: App): Promise<void> {
-    const { vault } = app;
+  async refresh(): Promise<void> {
+    const { vault } = this.app;
     const notes = vault.getMarkdownFiles();
     const paths = new Set(notes.map((note) => note.path));
     this.index.retain(paths);
@@ -87,7 +104,7 @@ export class NoteTexts {
 
     // An editor saves a moment after the last key. Until then the note has
     // more than the file, and the search goes by what the note has.
-    for (const { path, view } of openNotes(app)) {
+    for (const { path, view } of openNotes(this.app)) {
       if (paths.has(path)) {
         this.index.set(path, view.getViewData());
         // The file is read again the next time, for what was not saved in the end
@@ -106,12 +123,11 @@ export class NoteTexts {
    *   text, or null to leave the note as it is
    */
   change(
-    app: App,
     paths: readonly string[],
     change: (text: string, path: string) => string | null,
     onProgress?: OnChangeProgress,
   ): Promise<ChangeResult> {
-    const result = this.lastChange.then(() => this.changeNow(app, paths, change, onProgress));
+    const result = this.lastChange.then(() => this.changeNow(paths, change, onProgress));
     // A change that fails does not keep the ones after it from being made
     this.lastChange = result.catch(() => undefined);
     return result;
@@ -122,10 +138,9 @@ export class NoteTexts {
    * the texts the changes left. A note that was changed again since is left
    * as it is.
    */
-  undo(app: App, changes: readonly NoteChange[], onProgress?: OnChangeProgress): Promise<ChangeResult> {
+  undo(changes: readonly NoteChange[], onProgress?: OnChangeProgress): Promise<ChangeResult> {
     const byPath = new Map(changes.map((change) => [change.path, change]));
     return this.change(
-      app,
       [...byPath.keys()],
       (text, path) => {
         const change = byPath.get(path);
@@ -136,15 +151,15 @@ export class NoteTexts {
   }
 
   private async changeNow(
-    app: App,
     paths: readonly string[],
     change: (text: string, path: string) => string | null,
     onProgress?: OnChangeProgress,
   ): Promise<ChangeResult> {
+    const { vault } = this.app;
     const result: ChangeResult = { changes: [], failed: [], missing: [] };
-    const unsaved = await this.saveOpenNotes(app, new Set(paths));
+    const unsaved = await this.saveOpenNotes(new Set(paths));
     await inBatches(paths, async (path) => {
-      const file = app.vault.getFileByPath(path);
+      const file = vault.getFileByPath(path);
       if (!file) {
         this.index.delete(path);
         result.missing.push(path);
@@ -158,16 +173,18 @@ export class NoteTexts {
       try {
         // What the change makes, once the note is written
         const made: NoteChange[] = [];
-        const text = await app.vault.process(file, (before) => {
+        const text = await vault.process(file, (stored) => {
+          // The change gets the text as it was read, and the mark stays at the start
+          const [mark, before] = splitMark(stored);
           const after = change(before, path);
           if (after === null || after === before) {
-            return before;
+            return stored;
           }
           made.push({ path, before, after });
-          return after;
+          return mark + after;
         });
         result.changes.push(...made);
-        this.index.set(path, text);
+        this.index.set(path, splitMark(text)[1]);
       } catch (error: unknown) {
         console.error(`the-switcher: failed to change ${path}`, error);
         result.failed.push(path);
@@ -183,10 +200,10 @@ export class NoteTexts {
    *
    * @returns the notes that could not be saved
    */
-  private async saveOpenNotes(app: App, paths: Set<string>): Promise<Set<string>> {
+  private async saveOpenNotes(paths: Set<string>): Promise<Set<string>> {
     const failed = new Set<string>();
     await Promise.all(
-      openNotes(app).map(async ({ path, view }) => {
+      openNotes(this.app).map(async ({ path, view }) => {
         if (!paths.has(path)) {
           return;
         }

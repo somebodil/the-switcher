@@ -10,8 +10,8 @@ export interface LineMatch {
   line: number;
   /** The line, without the line break */
   text: string;
-  /** Where the matches are in the line */
-  ranges: Range[];
+  /** Where the first match is in the line. A result is shown with the matches around it. */
+  first: Range;
 }
 
 /** A part of a note: the lines from `first` on. */
@@ -104,13 +104,13 @@ export class TextSearch {
     const { paths } = this;
     while (!this.done) {
       const path = paths[this.next];
-      this.isWaiting = path !== undefined && isReady !== undefined && !isReady(path);
+      this.isWaiting = isReady !== undefined && !isReady(path);
       if (this.isWaiting) {
         return;
       }
       this.next++;
-      const text = path === undefined ? undefined : this.texts.get(path);
-      if (path !== undefined && text !== undefined) {
+      const text = this.texts.get(path);
+      if (text !== undefined) {
         this.look(path, text);
       }
       this.done = this.next >= paths.length;
@@ -182,12 +182,12 @@ export class TextSearch {
 
   /** Lists a line if it has a match. What the scan of a plain query finds always has one. */
   private list(path: string, line: number, text: string): void {
-    const ranges = this.matcher.findAll(text);
-    if (ranges.length === 0) {
+    const first = this.matcher.first(text);
+    if (first === null) {
       return;
     }
     this.count(path);
-    this.matches.push({ path, line, text, ranges });
+    this.matches.push({ path, line, text, first });
   }
 
   private count(path: string): void {
@@ -330,7 +330,8 @@ export function toSnippet<R extends Range>(
     end++;
   }
 
-  const prefix = isCut ? ELLIPSIS : "";
+  // The indentation that is left out has no ellipsis
+  const prefix = start > indentation ? ELLIPSIS : "";
   const suffix = end < line.length ? ELLIPSIS : "";
   const shift = prefix.length - start;
   return {

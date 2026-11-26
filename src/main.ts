@@ -23,7 +23,7 @@ const REPLACE_ICON = "replace";
 
 export default class TheSwitcherPlugin extends Plugin {
   private data: PluginData = { fileExclude: "", textExclude: "" };
-  private readonly noteTexts = new NoteTexts();
+  private readonly noteTexts = new NoteTexts(this.app);
   /** What each of the two dialogs worked out for the files the last time it was open, so that it is ready sooner the next time */
   private readonly keptFiles = new KeptIndex();
   private readonly keptNotes = new KeptIndex();
